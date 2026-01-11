@@ -1,0 +1,149 @@
+/**
+ * Global styles for Recurring Tasks Plugin
+ */
+
+/* Reset and base styles */
+* {
+  box-sizing: border-box;
+}
+
+/* Plugin container */
+.plugin-recurring-tasks {
+  font-family: var(--b3-font-family);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--b3-theme-on-background);
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Scrollbar styling */
+.dashboard__content::-webkit-scrollbar,
+.settings__content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dashboard__content::-webkit-scrollbar-track,
+.settings__content::-webkit-scrollbar-track {
+  background: var(--b3-theme-surface);
+}
+
+.dashboard__content::-webkit-scrollbar-thumb,
+.settings__content::-webkit-scrollbar-thumb {
+  background: var(--b3-border-color);
+  border-radius: 4px;
+}
+
+.dashboard__content::-webkit-scrollbar-thumb:hover,
+.settings__content::-webkit-scrollbar-thumb:hover {
+  background: var(--b3-theme-on-surface-light);
+}
+
+/* Button focus styles */
+button:focus-visible {
+  outline: 2px solid var(--b3-theme-primary);
+  outline-offset: 2px;
+}
+
+/* Input focus styles */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--b3-theme-primary);
+  outline-offset: 2px;
+}
+
+/* Animation for overlays */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.dashboard__overlay {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Utility classes */
+.text-muted {
+  color: var(--b3-theme-on-surface-light);
+}
+
+.text-primary {
+  color: var(--b3-theme-primary);
+}
+
+.text-error {
+  color: var(--b3-theme-error);
+}
+
+.text-success {
+  color: var(--b3-theme-success);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .dashboard__tabs {
+    overflow-x: auto;
+  }
+
+  .task-card__actions {
+    flex-direction: column;
+  }
+
+  .all-tasks-tab__table {
+    font-size: 12px;
+  }
+
+  .timeline-day {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .timeline-day__date {
+    width: 100%;
+    text-align: left;
+  }
+
+  .timeline-day:not(:last-child)::after {
+    display: none;
+  }
+}
+
+/* Dark mode adjustments */
+.b3-theme--dark {
+  .task-card--overdue {
+    border-left-color: #ff4444;
+  }
+
+  .task-card--today {
+    border-left-color: #4f46e5;
+  }
+
+  .settings__test-result.success {
+    background: rgba(76, 175, 80, 0.2);
+    color: #81c784;
+  }
+
+  .settings__test-result.error {
+    background: rgba(244, 67, 54, 0.2);
+    color: #e57373;
+  }
+}
+
+/* Print styles */
+@media print {
+  .dashboard__header,
+  .dashboard__tabs,
+  .task-card__actions,
+  .task-action-btn {
+    display: none !important;
+  }
+
+  .dashboard__content {
+    overflow: visible;
+  }
+}

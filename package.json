@@ -1,0 +1,35 @@
+{
+  "name": "plugin-sample-shehab-note",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "Advanced recurring task management plugin for Shehab-Note (SiYuan fork)",
+  "repository": "https://github.com/Drmusab/plugin-sample-shehab-note",
+  "homepage": "https://github.com/Drmusab/plugin-sample-shehab-note",
+  "keywords": [
+    "siyuan",
+    "shehab-note",
+    "plugin",
+    "tasks",
+    "recurring",
+    "notifications"
+  ],
+  "author": "Drmusab",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "vite build",
+    "make-link": "node --no-warnings ./scripts/make_dev_link.js"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@tsconfig/svelte": "^5.0.4",
+    "minimist": "^1.2.8",
+    "sass": "^1.77.6",
+    "siyuan": "^1.1.7",
+    "svelte": "^5.1.9",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.3",
+    "vite-plugin-static-copy": "^1.0.6",
+    "vite-plugin-zip-pack": "^1.2.4"
+  }
+}
