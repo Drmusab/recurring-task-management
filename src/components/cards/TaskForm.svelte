@@ -12,23 +12,49 @@
 
   let { task, onSave, onCancel }: Props = $props();
 
-  // Form state
-  let name = $state(task?.name || "");
-  let dueAt = $state(
-    task?.dueAt
-      ? new Date(task.dueAt).toISOString().slice(0, 16)
-      : new Date().toISOString().slice(0, 16)
-  );
-  let frequencyType = $state<FrequencyType>(task?.frequency.type || "daily");
-  let interval = $state(task?.frequency.interval || 1);
-  let time = $state(task?.frequency.time || "09:00");
-  let weekdays = $state<number[]>(task?.frequency.weekdays || []);
-  let enabled = $state(task?.enabled ?? true);
-  let note = $state(task?.alertPayload.note || "");
-  let media = $state(task?.alertPayload.media || "");
-  let link = $state(task?.alertPayload.link || "");
-
+  // Form state - initialize from task prop
   const isEditing = $derived(!!task);
+  
+  let name = $state("");
+  let dueAt = $state("");
+  let frequencyType = $state<FrequencyType>("daily");
+  let interval = $state(1);
+  let time = $state("09:00");
+  let weekdays = $state<number[]>([]);
+  let enabled = $state(true);
+  let note = $state("");
+  let media = $state("");
+  let link = $state("");
+
+  // Initialize form from task
+  $effect(() => {
+    if (task) {
+      name = task.name || "";
+      dueAt = task.dueAt
+        ? new Date(task.dueAt).toISOString().slice(0, 16)
+        : new Date().toISOString().slice(0, 16);
+      frequencyType = task.frequency.type || "daily";
+      interval = task.frequency.interval || 1;
+      time = task.frequency.time || "09:00";
+      weekdays = task.frequency.weekdays || [];
+      enabled = task.enabled ?? true;
+      note = task.alertPayload.note || "";
+      media = task.alertPayload.media || "";
+      link = task.alertPayload.link || "";
+    } else {
+      // Reset for new task
+      name = "";
+      dueAt = new Date().toISOString().slice(0, 16);
+      frequencyType = "daily";
+      interval = 1;
+      time = "09:00";
+      weekdays = [];
+      enabled = true;
+      note = "";
+      media = "";
+      link = "";
+    }
+  });
 
   function handleSave() {
     if (!name.trim()) {
@@ -117,8 +143,8 @@
   </div>
 
   <div class="task-form__field">
-    <label class="task-form__label">Frequency Type</label>
-    <select class="task-form__select" bind:value={frequencyType}>
+    <label class="task-form__label" for="frequency-type">Frequency Type</label>
+    <select id="frequency-type" class="task-form__select" bind:value={frequencyType}>
       <option value="daily">Daily</option>
       <option value="weekly">Weekly</option>
       <option value="monthly">Monthly</option>
@@ -150,8 +176,8 @@
 
   {#if frequencyType === "weekly"}
     <div class="task-form__field">
-      <label class="task-form__label">Weekdays</label>
-      <div class="task-form__weekdays">
+      <label class="task-form__label" for="weekdays-group">Weekdays</label>
+      <div id="weekdays-group" class="task-form__weekdays" role="group" aria-label="Select weekdays">
         {#each weekdayNames as day, index}
           <button
             class="task-form__weekday {weekdays.includes(index)

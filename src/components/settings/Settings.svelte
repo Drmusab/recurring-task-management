@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { NotificationConfig } from "@/services/types";
   import type { NotificationService } from "@/services/NotificationService";
+  import { DEFAULT_NOTIFICATION_CONFIG } from "@/utils/constants";
 
   interface Props {
     notificationService: NotificationService;
@@ -9,9 +10,14 @@
 
   let { notificationService, onClose }: Props = $props();
 
-  let config = $state<NotificationConfig>(notificationService.getConfig());
+  let config = $state<NotificationConfig>(DEFAULT_NOTIFICATION_CONFIG);
   let testingChannel: string | null = $state(null);
   let testResults = $state<{ [key: string]: { success: boolean; message: string } }>({});
+
+  // Initialize config from service
+  $effect(() => {
+    config = notificationService.getConfig();
+  });
 
   async function handleSave() {
     try {
