@@ -32,6 +32,7 @@ export class Scheduler {
     "task:due": new Set(),
     "task:overdue": new Set(),
   };
+  private readonly MAX_EMITTED_ENTRIES = 1000;
 
   constructor(
     storage: TaskStorage,
@@ -172,8 +173,25 @@ export class Scheduler {
           }
         }
       }
+      
+      // Cleanup emitted sets periodically
+      this.cleanupEmittedSets();
     } finally {
       this.isChecking = false;
+    }
+  }
+
+  private cleanupEmittedSets(): void {
+    if (this.emittedDue.size > this.MAX_EMITTED_ENTRIES) {
+      const entries = Array.from(this.emittedDue);
+      this.emittedDue = new Set(entries.slice(-this.MAX_EMITTED_ENTRIES / 2));
+      logger.info(`Cleaned up emittedDue set: ${entries.length} -> ${this.emittedDue.size}`);
+    }
+    
+    if (this.emittedMissed.size > this.MAX_EMITTED_ENTRIES) {
+      const entries = Array.from(this.emittedMissed);
+      this.emittedMissed = new Set(entries.slice(-this.MAX_EMITTED_ENTRIES / 2));
+      logger.info(`Cleaned up emittedMissed set: ${entries.length} -> ${this.emittedMissed.size}`);
     }
   }
 
