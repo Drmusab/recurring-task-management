@@ -41,7 +41,7 @@ describe("EventService", () => {
     store.set(EVENT_QUEUE_KEY, null);
 
     const fetcher = vi.fn().mockResolvedValue(okResponse);
-    const service = new EventService(plugin as any, fetcher);
+    const service = new EventService(plugin as any, { fetcher });
     await service.init();
 
     const task = createTask("Drink Water", { type: "daily", interval: 1, time: "10:15" });
@@ -66,7 +66,7 @@ describe("EventService", () => {
       .fn()
       .mockResolvedValueOnce(failResponse)
       .mockResolvedValueOnce(okResponse);
-    const service = new EventService(plugin as any, fetcher);
+    const service = new EventService(plugin as any, { fetcher });
     await service.init();
 
     const task = createTask("Stretch", { type: "daily", interval: 1, time: "08:00" });

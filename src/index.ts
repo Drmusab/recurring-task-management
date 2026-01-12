@@ -3,13 +3,12 @@ import { mount, unmount } from "svelte";
 import Dashboard from "./components/Dashboard.svelte";
 import { TaskStorage } from "./core/storage/TaskStorage";
 import { Scheduler } from "./core/engine/Scheduler";
-import { NotificationState } from "./core/engine/NotificationState";
 import { MigrationManager } from "./core/storage/MigrationManager";
 import { EventService } from "./services/EventService";
 import { registerCommands } from "./plugin/commands";
 import { registerBlockMenu } from "./plugin/menus";
 import { TopbarMenu } from "./plugin/topbar";
-import { DOCK_TYPE, NOTIFICATION_STATE_KEY, STORAGE_ACTIVE_KEY } from "./utils/constants";
+import { DOCK_TYPE, SCHEDULER_INTERVAL_MS, STORAGE_ACTIVE_KEY } from "./utils/constants";
 import * as logger from "./utils/logger";
 import "./index.scss";
 
@@ -17,7 +16,6 @@ export default class RecurringTasksPlugin extends Plugin {
   private storage!: TaskStorage;
   private scheduler!: Scheduler;
   private eventService!: EventService;
-  private notificationState!: NotificationState;
   private migrationManager!: MigrationManager;
   private topbarMenu!: TopbarMenu;
   private dashboardComponent: ReturnType<typeof mount> | null = null;
@@ -40,28 +38,14 @@ export default class RecurringTasksPlugin extends Plugin {
     this.storage = new TaskStorage(this);
     await this.storage.init();
 
-    // Initialize notification state
-    this.notificationState = new NotificationState(this, NOTIFICATION_STATE_KEY);
-    await this.notificationState.load();
-
     // Initialize event service
     this.eventService = new EventService(this);
     await this.eventService.init();
 
-    // Initialize scheduler with notification state
-    this.scheduler = new Scheduler(this.storage, this.notificationState, SCHEDULER_INTERVAL_MS, this);
-    this.scheduler.start(
-      async (task) => {
-        logger.info(`Task due: ${task.name}`);
-        const escalationLevel = this.notificationState.getEscalationLevel(task.id);
-        await this.eventService.emitTaskEvent("task.due", task, escalationLevel);
-      },
-      async (task) => {
-        logger.warn(`Task missed: ${task.name}`);
-        const escalationLevel = this.notificationState.getEscalationLevel(task.id);
-        await this.eventService.emitTaskEvent("task.missed", task, escalationLevel);
-      }
-    );
+    // Initialize scheduler (time-only) and bind its events to the orchestrator.
+    this.scheduler = new Scheduler(this.storage, SCHEDULER_INTERVAL_MS, this);
+    this.eventService.bindScheduler(this.scheduler);
+    this.scheduler.start();
 
     // Recover missed tasks from previous session
     try {
@@ -110,10 +94,7 @@ export default class RecurringTasksPlugin extends Plugin {
     
     // Stop scheduler
     this.scheduler.stop();
-    this.eventService.stopQueueWorker();
-
-    // Save notification state
-    await this.notificationState.forceSave();
+    await this.eventService.shutdown();
 
     // Flush pending task writes
     await this.storage.flush();
@@ -191,7 +172,7 @@ export default class RecurringTasksPlugin extends Plugin {
     try {
       const task = this.storage.getTask(taskId);
       if (task) {
-        await this.eventService.emitTaskEvent("task.completed", task, 0);
+        await this.eventService.handleTaskCompleted(task);
         await this.scheduler.markTaskDone(taskId);
         
         // Update topbar badge
@@ -213,7 +194,7 @@ export default class RecurringTasksPlugin extends Plugin {
     try {
       const task = this.storage.getTask(taskId);
       if (task) {
-        await this.eventService.emitTaskEvent("task.snoozed", task, 0);
+        await this.eventService.handleTaskSnoozed(task);
         await this.scheduler.delayTask(taskId, minutes);
         
         // Update topbar badge

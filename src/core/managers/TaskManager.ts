@@ -1,9 +1,7 @@
 import type { Plugin } from "siyuan";
 import { TaskStorage } from "@/core/storage/TaskStorage";
 import { Scheduler } from "@/core/engine/Scheduler";
-import { NotificationState } from "@/core/engine/NotificationState";
 import { EventService } from "@/services/EventService";
-import { NOTIFICATION_STATE_KEY } from "@/utils/constants";
 import * as logger from "@/utils/logger";
 
 /**
@@ -19,7 +17,6 @@ export class TaskManager {
   private storage!: TaskStorage;
   private scheduler!: Scheduler;
   private eventService!: EventService;
-  private notificationState!: NotificationState;
 
   private constructor(plugin: Plugin) {
     this.plugin = plugin;
@@ -53,16 +50,13 @@ export class TaskManager {
     this.storage = new TaskStorage(this.plugin);
     await this.storage.init();
 
-    // Initialize notification state
-    this.notificationState = new NotificationState(this.plugin, NOTIFICATION_STATE_KEY);
-    await this.notificationState.load();
-
     // Initialize event service
     this.eventService = new EventService(this.plugin);
     await this.eventService.init();
 
     // Initialize scheduler
-    this.scheduler = new Scheduler(this.storage, this.notificationState);
+    this.scheduler = new Scheduler(this.storage);
+    this.eventService.bindScheduler(this.scheduler);
 
     this.isInitialized = true;
     logger.info("TaskManager initialized successfully");
@@ -72,7 +66,7 @@ export class TaskManager {
    * Start the scheduler and recovery process
    */
   public async start(
-    onTaskDue: (task: any) => void,
+    onTaskDue?: (task: any) => void,
     onTaskMissed?: (task: any) => void
   ): Promise<void> {
     if (!this.isInitialized) {
@@ -80,7 +74,13 @@ export class TaskManager {
     }
 
     // Start scheduler
-    this.scheduler.start(onTaskDue, onTaskMissed);
+    if (onTaskDue) {
+      this.scheduler.on("task:due", ({ task }) => onTaskDue(task));
+    }
+    if (onTaskMissed) {
+      this.scheduler.on("task:overdue", ({ task }) => onTaskMissed(task));
+    }
+    this.scheduler.start();
     
     // Recover missed tasks from previous session
     await this.scheduler.recoverMissedTasks();
@@ -99,11 +99,7 @@ export class TaskManager {
     }
 
     if (this.eventService) {
-      this.eventService.stopQueueWorker();
-    }
-
-    if (this.notificationState) {
-      await this.notificationState.forceSave();
+      await this.eventService.shutdown();
     }
 
     this.isInitialized = false;
@@ -134,14 +130,6 @@ export class TaskManager {
   public getEventService(): EventService {
     this.ensureInitialized();
     return this.eventService;
-  }
-
-  /**
-   * Get the notification state instance
-   */
-  public getNotificationState(): NotificationState {
-    this.ensureInitialized();
-    return this.notificationState;
   }
 
   /**
