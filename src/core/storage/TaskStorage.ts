@@ -12,6 +12,7 @@ import {
 import { ActiveTaskStore } from "@/core/storage/ActiveTaskStore";
 import { ArchiveTaskStore, type ArchiveQuery } from "@/core/storage/ArchiveTaskStore";
 import * as logger from "@/utils/logger";
+import { TaskPersistenceController } from "@/core/storage/TaskPersistenceController";
 
 /**
  * Helper to safely access SiYuan's setBlockAttrs function
@@ -42,12 +43,14 @@ export class TaskStorage implements TaskStorageProvider {
   private taskBlockIndex: Map<string, string> = new Map(); // taskId -> blockId
   private activeStore: ActiveTaskStore;
   private archiveStore: ArchiveTaskStore;
+  private persistence: TaskPersistenceController;
 
   constructor(plugin: Plugin) {
     this.plugin = plugin;
     this.activeTasks = new Map();
     this.activeStore = new ActiveTaskStore(plugin);
     this.archiveStore = new ArchiveTaskStore(plugin);
+    this.persistence = new TaskPersistenceController(this.activeStore);
   }
 
   /**
@@ -79,7 +82,11 @@ export class TaskStorage implements TaskStorageProvider {
    * Save all tasks to disk
    */
   async save(): Promise<void> {
-    await this.activeStore.saveActive(this.activeTasks);
+    this.persistence.requestSave({ tasks: Array.from(this.activeTasks.values()) });
+  }
+
+  async flush(): Promise<void> {
+    await this.persistence.flush();
   }
 
   /**
@@ -214,7 +221,7 @@ export class TaskStorage implements TaskStorageProvider {
   }
 
   async saveActive(tasks: Map<string, Task>): Promise<void> {
-    await this.activeStore.saveActive(tasks);
+    this.persistence.requestSave({ tasks: Array.from(tasks.values()) });
   }
 
   async archiveTask(task: Task): Promise<void> {
@@ -248,7 +255,8 @@ export class TaskStorage implements TaskStorageProvider {
     const activeTasks = legacyTasks.filter((task: Task) => !archivedTasks.includes(task));
 
     const activeMap = new Map(activeTasks.map((task: Task) => [task.id, task]));
-    await this.activeStore.saveActive(activeMap);
+    this.persistence.requestSave({ tasks: Array.from(activeMap.values()) });
+    await this.persistence.flush();
 
     if (archivedTasks.length > 0) {
       await this.archiveStore.archiveTasks(archivedTasks);
