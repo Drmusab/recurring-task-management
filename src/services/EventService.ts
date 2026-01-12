@@ -1,5 +1,8 @@
 import type { Plugin } from "siyuan";
 import type { Task } from "@/core/models/Task";
+import type { TaskDueEvent } from "@/core/engine/SchedulerEvents";
+import type { Scheduler } from "@/core/engine/Scheduler";
+import { NotificationState } from "@/core/engine/NotificationState";
 import type { NotificationConfig, TaskEventPayload, TaskEventType, QueueItem } from "./types";
 import { createTaskSnapshot } from "./types";
 import {
@@ -9,6 +12,7 @@ import {
   EVENT_QUEUE_KEY,
   PLUGIN_EVENT_SOURCE,
   PLUGIN_EVENT_VERSION,
+  NOTIFICATION_STATE_KEY,
   SETTINGS_KEY,
 } from "@/utils/constants";
 
@@ -18,7 +22,8 @@ const RETRY_MAX_DELAY_MS = 30 * 60 * 1000;
 type Fetcher = typeof fetch;
 
 /**
- * EventService emits structured task events to n8n and manages retry queue.
+ * EventService orchestrates side effects from semantic task events.
+ * Scheduler emits "what happened"; EventService decides "what to do".
  */
 export class EventService {
   private plugin: Plugin;
@@ -27,17 +32,26 @@ export class EventService {
   private dedupeKeys: Set<string> = new Set();
   private flushIntervalId: number | null = null;
   private fetcher: Fetcher;
+  private notificationState: NotificationState;
+  private schedulerUnsubscribe: Array<() => void> = [];
 
-  constructor(plugin: Plugin, fetcher: Fetcher = fetch) {
+  constructor(
+    plugin: Plugin,
+    options: { fetcher?: Fetcher; notificationState?: NotificationState } = {}
+  ) {
     this.plugin = plugin;
-    this.fetcher = fetcher;
+    this.fetcher = options.fetcher ?? fetch;
     this.config = { ...DEFAULT_NOTIFICATION_CONFIG };
+    this.notificationState =
+      options.notificationState ??
+      new NotificationState(this.plugin, NOTIFICATION_STATE_KEY);
   }
 
   /**
    * Initialize the event service
    */
   async init(): Promise<void> {
+    await this.notificationState.load();
     await this.loadConfig();
     await this.loadQueue();
     await this.flushQueueOnStartup();
@@ -127,6 +141,85 @@ export class EventService {
       clearInterval(this.flushIntervalId);
       this.flushIntervalId = null;
     }
+  }
+
+  /**
+   * Graceful shutdown for side-effect state (queue + notification state).
+   */
+  async shutdown(): Promise<void> {
+    this.stopQueueWorker();
+    await this.notificationState.forceSave();
+  }
+
+  /**
+   * Wire scheduler events into the event pipeline.
+   * This keeps scheduler time-focused while centralizing side effects here.
+   */
+  bindScheduler(scheduler: Scheduler): void {
+    this.unbindScheduler();
+    this.schedulerUnsubscribe = [
+      scheduler.on("task:due", (payload) => {
+        void this.handleTaskDue(payload);
+      }),
+      scheduler.on("task:overdue", (payload) => {
+        void this.handleTaskOverdue(payload);
+      }),
+    ];
+  }
+
+  /**
+   * Remove scheduler listeners (useful for tests or teardown).
+   */
+  unbindScheduler(): void {
+    this.schedulerUnsubscribe.forEach((unsubscribe) => unsubscribe());
+    this.schedulerUnsubscribe = [];
+  }
+
+  /**
+   * Handle a task completion event and reset escalation policy.
+   */
+  async handleTaskCompleted(task: Task): Promise<void> {
+    await this.emitTaskEvent("task.completed", task, 0);
+    this.notificationState.resetEscalation(task.id);
+    await this.notificationState.save();
+  }
+
+  /**
+   * Handle a task snooze event.
+   */
+  async handleTaskSnoozed(task: Task): Promise<void> {
+    await this.emitTaskEvent("task.snoozed", task, 0);
+  }
+
+  private async handleTaskDue(event: TaskDueEvent): Promise<void> {
+    const taskKey = this.notificationState.generateTaskKey(
+      event.taskId,
+      event.dueAt.toISOString()
+    );
+    if (this.notificationState.hasNotified(taskKey)) {
+      return;
+    }
+
+    const escalationLevel = this.notificationState.getEscalationLevel(event.taskId);
+    await this.emitTaskEvent("task.due", event.task, escalationLevel);
+    this.notificationState.markNotified(taskKey);
+    void this.notificationState.save();
+  }
+
+  private async handleTaskOverdue(event: TaskDueEvent): Promise<void> {
+    const taskKey = this.notificationState.generateTaskKey(
+      event.taskId,
+      event.dueAt.toISOString()
+    );
+    if (this.notificationState.hasMissed(taskKey)) {
+      return;
+    }
+
+    const escalationLevel = this.notificationState.getEscalationLevel(event.taskId);
+    await this.emitTaskEvent("task.missed", event.task, escalationLevel);
+    this.notificationState.markMissed(taskKey);
+    this.notificationState.incrementEscalation(event.taskId);
+    void this.notificationState.save();
   }
 
   /**

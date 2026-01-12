@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Scheduler } from "@/core/engine/Scheduler";
 import { TaskStorage } from "@/core/storage/TaskStorage";
-import { NotificationState } from "@/core/engine/NotificationState";
 import { createTask } from "@/core/models/Task";
 import type { Frequency } from "@/core/models/Frequency";
+import type { TaskDueEvent } from "@/core/engine/SchedulerEvents";
 
 // Mock Plugin
 const mockPlugin = {
@@ -14,7 +14,6 @@ const mockPlugin = {
 
 describe("Scheduler - Recovery", () => {
   let storage: TaskStorage;
-  let notificationState: NotificationState;
   let scheduler: Scheduler;
 
   beforeEach(async () => {
@@ -32,11 +31,8 @@ describe("Scheduler - Recovery", () => {
 
     storage = new TaskStorage(mockPlugin);
     await storage.init();
-    
-    notificationState = new NotificationState(mockPlugin, "test-notification-state");
-    await notificationState.load();
-    
-    scheduler = new Scheduler(storage, notificationState, 60000, mockPlugin);
+
+    scheduler = new Scheduler(storage, 60000, mockPlugin);
   });
 
   describe("recoverMissedTasks", () => {
@@ -62,19 +58,17 @@ describe("Scheduler - Recovery", () => {
         timestamp: twoDaysAgo.toISOString(),
       });
 
-      const missedTasks: any[] = [];
-      scheduler.start(
-        () => {},
-        (task) => {
-          missedTasks.push(task);
-        }
-      );
+      const missedEvents: TaskDueEvent[] = [];
+      scheduler.on("task:overdue", (event) => {
+        missedEvents.push(event);
+      });
+      scheduler.start();
 
       await scheduler.recoverMissedTasks();
 
       // Should have detected the missed task
-      expect(missedTasks.length).toBeGreaterThan(0);
-      expect(missedTasks[0].id).toBe(task.id);
+      expect(missedEvents.length).toBeGreaterThan(0);
+      expect(missedEvents[0].taskId).toBe(task.id);
       
       scheduler.stop();
     });
@@ -101,7 +95,7 @@ describe("Scheduler - Recovery", () => {
         timestamp: fourDaysAgo.toISOString(),
       });
 
-      scheduler.start(() => {}, () => {});
+      scheduler.start();
       await scheduler.recoverMissedTasks();
 
       // Task should be advanced to a future occurrence
@@ -118,7 +112,7 @@ describe("Scheduler - Recovery", () => {
     });
 
     it("should save last run timestamp after recovery", async () => {
-      scheduler.start(() => {}, () => {});
+      scheduler.start();
       
       const beforeRecovery = new Date();
       await scheduler.recoverMissedTasks();
@@ -137,7 +131,7 @@ describe("Scheduler - Recovery", () => {
 
     it("should handle first run gracefully (no last timestamp)", async () => {
       // Don't set last run timestamp
-      scheduler.start(() => {}, () => {});
+      scheduler.start();
       
       // Should not throw and should save timestamp
       await expect(scheduler.recoverMissedTasks()).resolves.not.toThrow();
@@ -145,49 +139,6 @@ describe("Scheduler - Recovery", () => {
       const savedData = mockPlugin.data["last-run-timestamp"];
       expect(savedData).toBeDefined();
       expect(savedData.timestamp).toBeDefined();
-      
-      scheduler.stop();
-    });
-
-    it("should not notify for already notified missed tasks", async () => {
-      const frequency: Frequency = {
-        type: "daily",
-        interval: 1,
-        time: "09:00",
-      };
-
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      yesterday.setHours(9, 0, 0, 0);
-      
-      const task = createTask("Daily Task", frequency, yesterday);
-      await storage.saveTask(task);
-
-      // Mark as already notified
-      const taskKey = `${task.id}:${yesterday.toISOString()}`;
-      notificationState.markNotified(taskKey);
-      await notificationState.save();
-
-      // Set last run timestamp to 2 days ago
-      const twoDaysAgo = new Date();
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      await mockPlugin.saveData("last-run-timestamp", {
-        timestamp: twoDaysAgo.toISOString(),
-      });
-
-      const missedTasks: any[] = [];
-      scheduler.start(
-        () => {},
-        (task) => {
-          missedTasks.push(task);
-        }
-      );
-
-      await scheduler.recoverMissedTasks();
-
-      // Should not notify for already notified task
-      // This depends on the exact implementation, but generally should filter out
-      // tasks that have already been marked as notified
       
       scheduler.stop();
     });
@@ -214,18 +165,16 @@ describe("Scheduler - Recovery", () => {
         timestamp: sixDaysAgo.toISOString(),
       });
 
-      const missedTasks: any[] = [];
-      scheduler.start(
-        () => {},
-        (task) => {
-          missedTasks.push(task);
-        }
-      );
+      const missedEvents: TaskDueEvent[] = [];
+      scheduler.on("task:overdue", (event) => {
+        missedEvents.push(event);
+      });
+      scheduler.start();
 
       await scheduler.recoverMissedTasks();
 
       // Should detect multiple missed occurrences
-      expect(missedTasks.length).toBeGreaterThan(0);
+      expect(missedEvents.length).toBeGreaterThan(0);
       
       scheduler.stop();
     });
@@ -252,18 +201,16 @@ describe("Scheduler - Recovery", () => {
         timestamp: twoDaysAgo.toISOString(),
       });
 
-      const missedTasks: any[] = [];
-      scheduler.start(
-        () => {},
-        (task) => {
-          missedTasks.push(task);
-        }
-      );
+      const missedEvents: TaskDueEvent[] = [];
+      scheduler.on("task:overdue", (event) => {
+        missedEvents.push(event);
+      });
+      scheduler.start();
 
       await scheduler.recoverMissedTasks();
 
       // Should not include disabled tasks
-      expect(missedTasks.length).toBe(0);
+      expect(missedEvents.length).toBe(0);
       
       scheduler.stop();
     });
@@ -271,7 +218,7 @@ describe("Scheduler - Recovery", () => {
 
   describe("loadLastRunTimestamp and saveLastRunTimestamp", () => {
     it("should return null when no timestamp exists", async () => {
-      scheduler.start(() => {}, () => {});
+      scheduler.start();
       
       // First run should handle null timestamp gracefully
       await expect(scheduler.recoverMissedTasks()).resolves.not.toThrow();

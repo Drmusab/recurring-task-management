@@ -1,54 +1,61 @@
 import type { Task } from "@/core/models/Task";
 import type { TaskStorage } from "@/core/storage/TaskStorage";
 import { RecurrenceEngine } from "./RecurrenceEngine";
-import { NotificationState } from "./NotificationState";
 import { TimezoneHandler } from "./TimezoneHandler";
+import type { SchedulerEventListener, SchedulerEventType, TaskDueEvent } from "./SchedulerEvents";
 import { recordCompletion, recordMiss } from "@/core/models/Task";
 import { MISSED_GRACE_PERIOD_MS, SCHEDULER_INTERVAL_MS, LAST_RUN_TIMESTAMP_KEY, MAX_RECOVERY_ITERATIONS } from "@/utils/constants";
 import * as logger from "@/utils/logger";
 import type { Plugin } from "siyuan";
 
 /**
- * Scheduler manages task timing and triggers notifications
+ * Scheduler manages task timing and emits semantic events.
+ *
+ * Architecture note (before → after):
+ * - Before: Scheduler directly touched NotificationState and triggered side effects.
+ * - After: Scheduler emits "task:due"/"task:overdue" and remains time-focused;
+ *          EventService owns NotificationState and any reactions.
  */
 export class Scheduler {
   private storage: TaskStorage;
   private recurrenceEngine: RecurrenceEngine;
-  private notificationState: NotificationState | null = null;
-  private fallbackNotified: Set<string> = new Set();
-  private fallbackMissed: Set<string> = new Set();
+  private emittedDue: Set<string> = new Set();
+  private emittedMissed: Set<string> = new Set();
   private timezoneHandler: TimezoneHandler;
   private intervalId: number | null = null;
   private isChecking = false;
   private isRunning = false;
-  private onTaskDue: ((task: Task) => void) | null = null;
-  private onTaskMissed: ((task: Task) => void) | null = null;
   private intervalMs: number;
   private plugin: Plugin | null = null;
+  private listeners: Record<SchedulerEventType, Set<SchedulerEventListener>> = {
+    "task:due": new Set(),
+    "task:overdue": new Set(),
+  };
 
   constructor(
     storage: TaskStorage,
-    notificationState?: NotificationState,
     intervalMs: number = SCHEDULER_INTERVAL_MS,
     plugin?: Plugin
   ) {
     this.storage = storage;
     this.recurrenceEngine = new RecurrenceEngine();
-    this.notificationState = notificationState || null;
     this.timezoneHandler = new TimezoneHandler();
     this.intervalMs = intervalMs;
     this.plugin = plugin || null;
   }
 
   /**
+   * Subscribe to scheduler events.
+   */
+  on(eventType: SchedulerEventType, listener: SchedulerEventListener): () => void {
+    this.listeners[eventType].add(listener);
+    return () => this.listeners[eventType].delete(listener);
+  }
+
+  /**
    * Start the scheduler
    */
-  start(
-    onTaskDue: (task: Task) => void,
-    onTaskMissed?: (task: Task) => void
-  ): void {
-    this.onTaskDue = onTaskDue;
-    this.onTaskMissed = onTaskMissed ?? null;
+  start(): void {
     this.checkDueTasks(); // Check immediately
     this.isRunning = true;
 
@@ -117,28 +124,17 @@ export class Scheduler {
         const dueDate = new Date(task.dueAt);
         const isDue = dueDate <= now;
 
-        // Generate task key for deduplication
-        const taskKey = this.notificationState
-          ? this.notificationState.generateTaskKey(task.id, task.dueAt)
-          : `${task.id}-${task.dueAt}`;
-
         // Check if task is due
-        if (isDue && this.onTaskDue) {
-          const alreadyNotified = this.notificationState
-            ? this.notificationState.hasNotified(taskKey)
-            : this.fallbackNotified.has(taskKey);
-
-          if (!alreadyNotified) {
-            this.onTaskDue(task);
-
-            if (this.notificationState) {
-              this.notificationState.markNotified(taskKey);
-              // Save state asynchronously
-              void this.notificationState.save();
-            } else {
-              this.fallbackNotified.add(taskKey);
-            }
-
+        if (isDue) {
+          const taskKey = this.buildOccurrenceKey(task.id, dueDate, "hour");
+          if (!this.emittedDue.has(taskKey)) {
+            this.emitEvent("task:due", {
+              taskId: task.id,
+              dueAt: dueDate,
+              context: "today",
+              task,
+            });
+            this.emittedDue.add(taskKey);
             logger.info(`Task due: ${task.name}`, { taskId: task.id, dueAt: task.dueAt });
           }
         }
@@ -150,26 +146,18 @@ export class Scheduler {
 
         if (
           isDue &&
-          this.onTaskMissed &&
           now.getTime() - dueDate.getTime() >= MISSED_GRACE_PERIOD_MS &&
           (!lastCompletedAt || lastCompletedAt < dueDate)
         ) {
-          const alreadyMissed = this.notificationState
-            ? this.notificationState.hasMissed(taskKey)
-            : this.fallbackMissed.has(taskKey);
-
-          if (!alreadyMissed) {
-            this.onTaskMissed(task);
-
-            if (this.notificationState) {
-              this.notificationState.markMissed(taskKey);
-              this.notificationState.incrementEscalation(task.id);
-              // Save state asynchronously
-              void this.notificationState.save();
-            } else {
-              this.fallbackMissed.add(taskKey);
-            }
-
+          const taskKey = this.buildOccurrenceKey(task.id, dueDate, "hour");
+          if (!this.emittedMissed.has(taskKey)) {
+            this.emitEvent("task:overdue", {
+              taskId: task.id,
+              dueAt: dueDate,
+              context: "overdue",
+              task,
+            });
+            this.emittedMissed.add(taskKey);
             logger.warn(`Task missed: ${task.name}`, { taskId: task.id, dueAt: task.dueAt });
           }
         }
@@ -204,12 +192,6 @@ export class Scheduler {
     // Update task
     task.dueAt = nextDue.toISOString();
     await this.storage.saveTask(task);
-
-    // Reset escalation
-    if (this.notificationState) {
-      this.notificationState.resetEscalation(task.id);
-      await this.notificationState.save();
-    }
 
     logger.info(`Task "${task.name}" completed and rescheduled to ${nextDue.toISOString()}`);
   }
@@ -325,19 +307,15 @@ export class Scheduler {
         );
         
         for (const missedAt of missedOccurrences) {
-          const taskKey = `${task.id}:${missedAt.toISOString()}`;
-          const hasMissed = this.notificationState
-            ? this.notificationState.hasMissed(taskKey)
-            : this.fallbackMissed.has(taskKey);
-
-          if (!hasMissed && this.onTaskMissed) {
-            this.onTaskMissed(task);
-            
-            if (this.notificationState) {
-              this.notificationState.markMissed(taskKey);
-            } else {
-              this.fallbackMissed.add(taskKey);
-            }
+          const taskKey = this.buildOccurrenceKey(task.id, missedAt, "exact");
+          if (!this.emittedMissed.has(taskKey)) {
+            this.emitEvent("task:overdue", {
+              taskId: task.id,
+              dueAt: missedAt,
+              context: "overdue",
+              task,
+            });
+            this.emittedMissed.add(taskKey);
           }
         }
         
@@ -346,11 +324,6 @@ export class Scheduler {
       } catch (err) {
         logger.error(`Failed to recover task ${task.id}:`, err);
       }
-    }
-    
-    // Save notification state if available
-    if (this.notificationState) {
-      await this.notificationState.save();
     }
     
     await this.saveLastRunTimestamp(now);
@@ -434,5 +407,33 @@ export class Scheduler {
    */
   getTimezoneHandler(): TimezoneHandler {
     return this.timezoneHandler;
+  }
+
+  private emitEvent(eventType: SchedulerEventType, payload: TaskDueEvent): void {
+    const listeners = this.listeners[eventType];
+    for (const listener of listeners) {
+      try {
+        const result = listener(payload);
+        if (result instanceof Promise) {
+          result.catch((err) => {
+            logger.error(`Scheduler listener error for ${eventType}:`, err);
+          });
+        }
+      } catch (err) {
+        logger.error(`Scheduler listener error for ${eventType}:`, err);
+      }
+    }
+  }
+
+  private buildOccurrenceKey(
+    taskId: string,
+    dueAt: Date,
+    precision: "hour" | "exact"
+  ): string {
+    if (precision === "exact") {
+      return `${taskId}:${dueAt.toISOString()}`;
+    }
+
+    return `${taskId}:${dueAt.toISOString().slice(0, 13)}`;
   }
 }
