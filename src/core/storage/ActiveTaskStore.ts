@@ -2,8 +2,13 @@ import type { Plugin } from "siyuan";
 import type { Task } from "@/core/models/Task";
 import { STORAGE_ACTIVE_KEY } from "@/utils/constants";
 import * as logger from "@/utils/logger";
+import { TaskState, type TaskStateWriter } from "@/core/storage/TaskPersistenceController";
+import { promises as fs } from "fs";
+import path from "path";
 
-export class ActiveTaskStore {
+const TEMP_SUFFIX = ".tmp";
+
+export class ActiveTaskStore implements TaskStateWriter {
   private plugin: Plugin;
 
   constructor(plugin: Plugin) {
@@ -23,13 +28,55 @@ export class ActiveTaskStore {
   }
 
   async saveActive(tasks: Map<string, Task>): Promise<void> {
+    await this.write({ tasks: Array.from(tasks.values()) });
+  }
+
+  async write(state: TaskState): Promise<void> {
     try {
-      const payload = { tasks: Array.from(tasks.values()) };
-      await this.plugin.saveData(STORAGE_ACTIVE_KEY, payload);
-      logger.info(`Saved ${payload.tasks.length} active tasks`);
+      await this.saveActiveAtomic(state);
+      logger.info(`Saved ${state.tasks.length} active tasks`);
     } catch (err) {
       logger.error("Failed to save active tasks", err);
       throw err;
     }
+  }
+
+  private async saveActiveAtomic(state: TaskState): Promise<void> {
+    const filePath = this.resolveStoragePath(STORAGE_ACTIVE_KEY);
+    if (!filePath) {
+      await this.plugin.saveData(STORAGE_ACTIVE_KEY, state);
+      return;
+    }
+
+    const dir = path.dirname(filePath);
+    await fs.mkdir(dir, { recursive: true });
+
+    const tempPath = `${filePath}${TEMP_SUFFIX}`;
+    const data = JSON.stringify(state);
+    const handle = await fs.open(tempPath, "w");
+    try {
+      await handle.writeFile(data, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+
+    try {
+      await fs.rename(tempPath, filePath);
+    } catch (err) {
+      await fs.rm(filePath, { force: true });
+      await fs.rename(tempPath, filePath);
+    }
+  }
+
+  private resolveStoragePath(storageKey: string): string | null {
+    const dataDir = (globalThis as any)?.siyuan?.config?.system?.dataDir as string | undefined;
+    const pluginName = this.plugin.name;
+
+    if (!dataDir || !pluginName) {
+      return null;
+    }
+
+    return path.join(dataDir, "storage", `p${pluginName}`, `${storageKey}.json`);
   }
 }

@@ -115,6 +115,9 @@ export default class RecurringTasksPlugin extends Plugin {
     // Save notification state
     await this.notificationState.forceSave();
 
+    // Flush pending task writes
+    await this.storage.flush();
+
     // Destroy topbar menu
     if (this.topbarMenu) {
       this.topbarMenu.destroy();
