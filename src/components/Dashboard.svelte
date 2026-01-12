@@ -7,6 +7,7 @@
   import TodayTab from "./tabs/TodayTab.svelte";
   import AllTasksTab from "./tabs/AllTasksTab.svelte";
   import TimelineTab from "./tabs/TimelineTab.svelte";
+  import AnalyticsTab from "./tabs/AnalyticsTab.svelte";
   import TaskForm from "./cards/TaskForm.svelte";
   import Settings from "./settings/Settings.svelte";
 
@@ -21,7 +22,7 @@
   // Get timezone handler from scheduler
   const timezoneHandler = scheduler.getTimezoneHandler();
 
-  let activeTab = $state<"today" | "all" | "timeline">("today");
+  let activeTab = $state<"today" | "all" | "timeline" | "analytics">("today");
   let showTaskForm = $state(false);
   let showSettings = $state(false);
   let editingTask = $state<Task | undefined>(undefined);
@@ -167,6 +168,12 @@
       >
         📅 Timeline
       </button>
+      <button
+        class="dashboard__tab {activeTab === 'analytics' ? 'active' : ''}"
+        onclick={() => (activeTab = "analytics")}
+      >
+        📊 Analytics
+      </button>
     </div>
 
     <div class="dashboard__content">
@@ -192,6 +199,8 @@
           tasks={allTasks}
           recurrenceEngine={scheduler.getRecurrenceEngine()}
         />
+      {:else if activeTab === "analytics"}
+        <AnalyticsTab tasks={allTasks} />
       {/if}
     </div>
   {/if}
