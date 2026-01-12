@@ -86,15 +86,16 @@ export class TaskStorage {
    * Add or update a task
    */
   async saveTask(task: Task): Promise<void> {
-    // Update block index if task has linkedBlockId
-    if (task.linkedBlockId) {
-      // Remove old block index entry if blockId changed
-      const existingTask = this.tasks.get(task.id);
-      if (existingTask?.linkedBlockId && existingTask.linkedBlockId !== task.linkedBlockId) {
-        this.blockIndex.delete(existingTask.linkedBlockId);
+    // Find and remove old block index entry for this task (if any)
+    // We need to search through the index because the task object may have been mutated
+    for (const [blockId, taskId] of this.blockIndex.entries()) {
+      if (taskId === task.id && blockId !== task.linkedBlockId) {
+        this.blockIndex.delete(blockId);
       }
-      
-      // Add new block index entry
+    }
+    
+    // Add new block index entry if task has linkedBlockId
+    if (task.linkedBlockId) {
       this.blockIndex.set(task.linkedBlockId, task.id);
     }
 
