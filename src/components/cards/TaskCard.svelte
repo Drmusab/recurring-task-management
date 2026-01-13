@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Task } from "@/core/models/Task";
   import { calculateTaskHealth } from "@/core/models/Task";
-  import { formatDateTime, isOverdue, isToday } from "@/utils/date";
+  import { tick } from "svelte";
+  import { fetchBlockPreview } from "@/utils/blocks";
+  import { daysBetween, formatDateTime, isOverdue, isToday } from "@/utils/date";
   import { PRIORITY_COLORS, SNOOZE_OPTIONS } from "@/utils/constants";
 
   interface Props {
@@ -18,9 +20,26 @@
   const dueDate = $derived(new Date(task.dueAt));
   const overdue = $derived(isOverdue(dueDate));
   const today = $derived(isToday(dueDate));
+  const overdueDays = $derived(
+    overdue ? daysBetween(new Date(task.dueAt), new Date()) : 0
+  );
   const statusClass = $derived(
     overdue ? "task-card--overdue" : today ? "task-card--today" : ""
   );
+  const overdueTint = $derived(() => {
+    if (!overdue) {
+      return "";
+    }
+    const strength = Math.min(0.45, 0.12 + overdueDays * 0.05);
+    return `rgba(244, 67, 54, ${strength})`;
+  });
+  const overdueBorder = $derived(() => {
+    if (!overdue) {
+      return "";
+    }
+    const strength = Math.min(0.8, 0.3 + overdueDays * 0.08);
+    return `rgba(244, 67, 54, ${strength})`;
+  });
 
   const priorityColor = $derived(
     task.priority ? PRIORITY_COLORS[task.priority] : PRIORITY_COLORS.normal
@@ -34,13 +53,7 @@
   });
 
   const hasStreak = $derived((task.currentStreak || 0) > 0);
-  const streakEmoji = $derived(() => {
-    const streak = task.currentStreak || 0;
-    if (streak >= 10) return "🔥🔥";
-    if (streak >= 5) return "🔥";
-    if (streak >= 3) return "⚡";
-    return "✨";
-  });
+  const streakEmoji = $derived(() => "🔥");
 
   const health = $derived(calculateTaskHealth(task));
   const healthClass = $derived(
@@ -50,6 +63,36 @@
   );
 
   let showSnoozeMenu = $state(false);
+  let firstSnoozeOption: HTMLButtonElement | null = $state(null);
+  let showBlockPreview = $state(false);
+  let blockPreview = $state<string | null>(null);
+  let blockPreviewLoading = $state(false);
+  const blockIdLabel = $derived(() => {
+    if (!task.linkedBlockId) {
+      return "";
+    }
+    return task.linkedBlockId.length > 10
+      ? `${task.linkedBlockId.slice(0, 10)}…`
+      : task.linkedBlockId;
+  });
+  const blockPreviewText = $derived(() => {
+    if (!blockPreview) {
+      return "";
+    }
+    const trimmed = blockPreview.replace(/\s+/g, " ").trim();
+    return trimmed.length > 220 ? `${trimmed.slice(0, 220)}…` : trimmed;
+  });
+
+  const quickSnoozeOptions = $derived(() =>
+    SNOOZE_OPTIONS.filter((option) =>
+      [15, 60, 120].includes(option.minutes)
+    )
+  );
+
+  $effect(() => {
+    blockPreview = task.linkedBlockContent ?? null;
+    blockPreviewLoading = false;
+  });
 
   function handleDone() {
     onDone(task);
@@ -69,8 +112,12 @@
     onSkip(task);
   }
 
-  function toggleSnoozeMenu() {
+  async function toggleSnoozeMenu() {
     showSnoozeMenu = !showSnoozeMenu;
+    if (showSnoozeMenu) {
+      await tick();
+      firstSnoozeOption?.focus();
+    }
   }
 
   function handleSnooze(minutes: number) {
@@ -81,9 +128,44 @@
     window.dispatchEvent(event);
     showSnoozeMenu = false;
   }
+
+  function handleSnoozeKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape" && showSnoozeMenu) {
+      showSnoozeMenu = false;
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      void toggleSnoozeMenu();
+    }
+  }
+
+  async function handleBlockPreviewOpen() {
+    showBlockPreview = true;
+    if (!task.linkedBlockId || blockPreview || blockPreviewLoading) {
+      return;
+    }
+    blockPreviewLoading = true;
+    const content = await fetchBlockPreview(task.linkedBlockId);
+    blockPreview = content;
+    blockPreviewLoading = false;
+  }
+
+  function handleBlockPreviewClose() {
+    showBlockPreview = false;
+  }
 </script>
 
-<div class="task-card {statusClass}">
+<div
+  class="task-card {statusClass}"
+  style="--overdue-tint: {overdueTint}; --overdue-border: {overdueBorder};"
+  tabindex="0"
+  onkeydown={(event) => {
+    if (event.key === "Escape" && showSnoozeMenu) {
+      showSnoozeMenu = false;
+    }
+  }}
+>
   <div class="task-card__header">
     <div class="task-card__title-row">
       <div
@@ -125,9 +207,27 @@
 
     {#if task.linkedBlockId}
       <div class="task-card__linked-block">
-        <button class="task-card__block-link" title="Go to linked block">
-          📝 Go to Block
+        <button
+          class="task-card__block-link"
+          title={`Linked block: ${task.linkedBlockId}`}
+          onmouseenter={handleBlockPreviewOpen}
+          onmouseleave={handleBlockPreviewClose}
+          onfocus={handleBlockPreviewOpen}
+          onblur={handleBlockPreviewClose}
+        >
+          📝 Block {blockIdLabel}
         </button>
+        {#if showBlockPreview}
+          <div class="task-card__block-preview" role="tooltip">
+            {#if blockPreviewLoading}
+              Loading preview…
+            {:else if blockPreview}
+              {blockPreviewText}
+            {:else}
+              No preview available.
+            {/if}
+          </div>
+        {/if}
       </div>
     {/if}
   </div>
@@ -141,19 +241,42 @@
       <button
         class="task-card__action task-card__action--snooze"
         onclick={toggleSnoozeMenu}
+        onkeydown={handleSnoozeKeydown}
         aria-label="Snooze task"
+        aria-expanded={showSnoozeMenu}
       >
         🕒 Snooze
       </button>
+      <div class="task-card__snooze-quick">
+        {#each quickSnoozeOptions as option}
+          <button
+            class="task-card__snooze-chip"
+            onclick={() => handleSnooze(option.minutes)}
+            aria-label={`Snooze for ${option.label}`}
+          >
+            {option.label}
+          </button>
+        {/each}
+      </div>
       {#if showSnoozeMenu}
-        <div class="task-card__snooze-menu">
-          {#each SNOOZE_OPTIONS as option}
-            <button
-              class="task-card__snooze-option"
-              onclick={() => handleSnooze(option.minutes)}
-            >
-              {option.label}
-            </button>
+        <div class="task-card__snooze-menu" onkeydown={handleSnoozeKeydown}>
+          {#each SNOOZE_OPTIONS as option, index}
+            {#if index === 0}
+              <button
+                class="task-card__snooze-option"
+                bind:this={firstSnoozeOption}
+                onclick={() => handleSnooze(option.minutes)}
+              >
+                {option.label}
+              </button>
+            {:else}
+              <button
+                class="task-card__snooze-option"
+                onclick={() => handleSnooze(option.minutes)}
+              >
+                {option.label}
+              </button>
+            {/if}
           {/each}
         </div>
       {/if}
@@ -197,8 +320,14 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   }
 
+  .task-card:focus {
+    outline: 2px solid var(--b3-theme-primary);
+    outline-offset: 2px;
+  }
+
   .task-card--overdue {
-    border-left: 4px solid var(--b3-theme-error);
+    border-left: 4px solid var(--overdue-border, var(--b3-theme-error));
+    background: var(--overdue-tint, transparent);
   }
 
   .task-card--today {
@@ -284,6 +413,7 @@
 
   .task-card__linked-block {
     margin-top: 8px;
+    position: relative;
   }
 
   .task-card__block-link {
@@ -301,6 +431,23 @@
     background: var(--b3-theme-surface-light);
   }
 
+  .task-card__block-preview {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 6px;
+    padding: 8px 10px;
+    max-width: 280px;
+    background: var(--b3-theme-surface);
+    border: 1px solid var(--b3-border-color);
+    border-radius: 6px;
+    color: var(--b3-theme-on-surface);
+    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    z-index: 120;
+    white-space: pre-wrap;
+  }
+
   .task-card__actions {
     display: flex;
     gap: 8px;
@@ -309,6 +456,9 @@
 
   .task-card__snooze-container {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .task-card__action {
@@ -329,6 +479,27 @@
   }
 
   .task-card__action--snooze:hover {
+    background: var(--b3-theme-surface-light);
+  }
+
+  .task-card__snooze-quick {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .task-card__snooze-chip {
+    padding: 4px 8px;
+    border: 1px solid var(--b3-border-color);
+    border-radius: 999px;
+    background: var(--b3-theme-surface);
+    color: var(--b3-theme-on-surface);
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .task-card__snooze-chip:hover {
     background: var(--b3-theme-surface-light);
   }
 

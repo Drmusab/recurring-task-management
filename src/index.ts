@@ -1,6 +1,7 @@
 import { Plugin } from "siyuan";
 import { mount, unmount } from "svelte";
 import Dashboard from "./components/Dashboard.svelte";
+import QuickAddOverlay from "./components/cards/QuickAddOverlay.svelte";
 import { TaskStorage } from "./core/storage/TaskStorage";
 import { Scheduler } from "./core/engine/Scheduler";
 import { MigrationManager } from "./core/storage/MigrationManager";
@@ -21,6 +22,8 @@ export default class RecurringTasksPlugin extends Plugin {
   private topbarMenu!: TopbarMenu;
   private dashboardComponent: ReturnType<typeof mount> | null = null;
   private dockEl!: HTMLElement;
+  private quickAddComponent: ReturnType<typeof mount> | null = null;
+  private quickAddContainer: HTMLElement | null = null;
 
   async onload() {
     logger.info("Loading Recurring Tasks Plugin");
@@ -107,6 +110,7 @@ export default class RecurringTasksPlugin extends Plugin {
     
     // Destroy dashboard
     this.destroyDashboard();
+    this.closeQuickAdd();
 
     // Remove event listeners
     this.removeEventListeners();
@@ -154,14 +158,16 @@ export default class RecurringTasksPlugin extends Plugin {
 
   private handleCreateTaskEvent = (event: Event) => {
     try {
-      const customEvent = event as CustomEvent<{ action?: string }>;
+      const customEvent = event as CustomEvent<{
+        action?: string;
+        suggestedName?: string;
+        linkedBlockId?: string;
+        linkedBlockContent?: string;
+        suggestedTime?: string | null;
+      }>;
       logger.info("Create task event received", customEvent.detail);
 
-      // Open the dock
-      this.openDock();
-
-      // Dispatch event to dashboard to open task form
-      // This would need to be implemented in the Dashboard component
+      this.openQuickAdd(customEvent.detail);
     } catch (err) {
       logger.error("Failed to handle create task event", err);
       toast.error("Failed to open task creator.");
@@ -232,4 +238,36 @@ export default class RecurringTasksPlugin extends Plugin {
       toast.error("Failed to snooze task.");
     }
   };
+
+  private openQuickAdd(prefill?: {
+    suggestedName?: string;
+    linkedBlockId?: string;
+    linkedBlockContent?: string;
+    suggestedTime?: string | null;
+  }) {
+    if (this.quickAddComponent) {
+      this.closeQuickAdd();
+    }
+    this.quickAddContainer = document.createElement("div");
+    document.body.appendChild(this.quickAddContainer);
+    this.quickAddComponent = mount(QuickAddOverlay, {
+      target: this.quickAddContainer,
+      props: {
+        storage: this.storage,
+        prefill,
+        onClose: () => this.closeQuickAdd(),
+      },
+    });
+  }
+
+  private closeQuickAdd() {
+    if (this.quickAddComponent) {
+      unmount(this.quickAddComponent);
+      this.quickAddComponent = null;
+    }
+    if (this.quickAddContainer) {
+      this.quickAddContainer.remove();
+      this.quickAddContainer = null;
+    }
+  }
 }
