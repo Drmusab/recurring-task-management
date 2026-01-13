@@ -11,18 +11,36 @@ interface ToastOptions {
   message: string;
   type?: ToastType;
   duration?: number;
+  actionLabel?: string;
+  onAction?: () => void;
 }
 
 /**
  * Show a toast notification
  */
 export function showToast(options: ToastOptions): void {
-  const { message, type = "info", duration = 3000 } = options;
+  const { message, type = "info", duration = 3000, actionLabel, onAction } = options;
 
   // Create toast element
   const toast = document.createElement("div");
   toast.className = `recurring-tasks-toast recurring-tasks-toast--${type}`;
-  toast.textContent = message;
+  const messageEl = document.createElement("span");
+  messageEl.textContent = message;
+  toast.appendChild(messageEl);
+
+  if (actionLabel && onAction) {
+    const actionButton = document.createElement("button");
+    actionButton.type = "button";
+    actionButton.textContent = actionLabel;
+    actionButton.className = "recurring-tasks-toast__action";
+    actionButton.addEventListener("click", () => {
+      onAction();
+      if (toast.parentElement) {
+        toast.parentElement.removeChild(toast);
+      }
+    });
+    toast.appendChild(actionButton);
+  }
 
   // Add styles
   Object.assign(toast.style, {
@@ -37,20 +55,30 @@ export function showToast(options: ToastOptions): void {
     fontWeight: "500",
     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
     zIndex: "10000",
-    maxWidth: "400px",
+    maxWidth: "420px",
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
     animation: "slideInRight 0.3s ease-out",
   });
 
   // Add to document
   document.body.appendChild(toast);
 
-  // Remove after duration
-  setTimeout(() => {
+  const dismissToast = () => {
     toast.style.animation = "slideOutRight 0.3s ease-out";
     setTimeout(() => {
-      document.body.removeChild(toast);
+      if (toast.parentElement) {
+        toast.parentElement.removeChild(toast);
+      }
     }, 300);
-  }, duration);
+  };
+
+  if (duration > 0) {
+    setTimeout(() => {
+      dismissToast();
+    }, duration);
+  }
 }
 
 /**
@@ -122,6 +150,23 @@ if (typeof document !== "undefined") {
         transform: translateX(100%);
         opacity: 0;
       }
+    }
+
+    .recurring-tasks-toast__action {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .recurring-tasks-toast__action:hover {
+      background: rgba(255, 255, 255, 0.3);
     }
   `;
   document.head.appendChild(style);

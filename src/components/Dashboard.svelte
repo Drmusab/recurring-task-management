@@ -4,7 +4,7 @@
   import type { TaskStorage } from "@/core/storage/TaskStorage";
   import type { Scheduler } from "@/core/engine/Scheduler";
   import type { EventService } from "@/services/EventService";
-  import { toast } from "@/utils/notifications";
+  import { showToast, toast } from "@/utils/notifications";
   import { isValidFrequency } from "@/core/models/Frequency";
   import {
     getTodayAndOverdueTasks,
@@ -12,6 +12,7 @@
     updateTaskById,
     upsertTask,
   } from "./dashboard/taskState";
+  import { onDestroy, onMount } from "svelte";
   import TodayTab from "./tabs/TodayTab.svelte";
   import AllTasksTab from "./tabs/AllTasksTab.svelte";
   import TimelineTab from "./tabs/TimelineTab.svelte";
@@ -43,6 +44,29 @@
 
   const recurrenceEngine = scheduler.getRecurrenceEngine();
 
+  function formatNextDueLabel(date: Date): string {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(now.getDate() + 1);
+
+    const timeLabel = date.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+
+    if (date.toDateString() === now.toDateString()) {
+      return `Today at ${timeLabel}`;
+    }
+    if (date.toDateString() === tomorrow.toDateString()) {
+      return `Tomorrow at ${timeLabel}`;
+    }
+
+    return `${date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    })} at ${timeLabel}`;
+  }
+
   // Refresh tasks from storage (initial load / explicit reloads only)
   function loadTasksFromStorage(reason: "initial" | "reload" | "external" = "initial") {
     // Shallow copy keeps UI state decoupled from storage while avoiding deep clones.
@@ -55,6 +79,14 @@
   // Initialize
   loadTasksFromStorage();
 
+  const refreshHandler = () => loadTasksFromStorage("reload");
+  onMount(() => {
+    window.addEventListener("recurring-task-refresh", refreshHandler);
+  });
+  onDestroy(() => {
+    window.removeEventListener("recurring-task-refresh", refreshHandler);
+  });
+
   async function handleTaskDone(task: Task) {
     const previousTasks = allTasks;
     const nextTasks = updateTaskById(allTasks, task.id, (current) => {
@@ -66,16 +98,34 @@
     });
 
     allTasks = nextTasks;
-    toast.success(`Task "${task.name}" completed and rescheduled`);
+    const updatedTask = nextTasks.find((item) => item.id === task.id);
+    const nextDueLabel = updatedTask ? formatNextDueLabel(new Date(updatedTask.dueAt)) : "soon";
+    const undoTimeout = window.setTimeout(async () => {
+      try {
+        await eventService.emitTaskEvent("task.completed", task);
+        await scheduler.markTaskDone(task.id);
+      } catch (err) {
+        allTasks = previousTasks;
+        toast.error("Failed to mark task as done: " + err);
+        loadTasksFromStorage("external");
+      }
+    }, 5000);
 
-    try {
-      await eventService.emitTaskEvent("task.completed", task);
-      await scheduler.markTaskDone(task.id);
-    } catch (err) {
+    const undoCompletion = () => {
+      window.clearTimeout(undoTimeout);
       allTasks = previousTasks;
-      toast.error("Failed to mark task as done: " + err);
-      loadTasksFromStorage("external");
-    }
+      toast.info(`Undo: "${task.name}" restored`);
+    };
+
+    showToast({
+      message: `Task "${task.name}" completed. Next: ${nextDueLabel}`,
+      type: "success",
+      duration: 5000,
+      actionLabel: "Undo",
+      onAction: undoCompletion,
+    });
+
+    return;
   }
 
   async function handleTaskDelay(task: Task) {

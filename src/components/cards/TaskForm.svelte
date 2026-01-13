@@ -2,7 +2,6 @@
   import type { Task } from "@/core/models/Task";
   import type { Frequency, FrequencyType } from "@/core/models/Frequency";
   import { createTask } from "@/core/models/Task";
-  import { createDefaultFrequency } from "@/core/models/Frequency";
   import { WEEKDAY_NAMES } from "@/utils/constants";
   import { toast } from "@/utils/notifications";
 
@@ -28,6 +27,39 @@
   let linkedBlockId = $state("");
   let priority = $state<"low" | "normal" | "high">("normal");
   let tags = $state("");
+  let touched = $state({
+    name: false,
+    dueAt: false,
+    weekdays: false,
+    dayOfMonth: false,
+  });
+
+  const nameError = $derived(() =>
+    touched.name && !name.trim() ? "Task name is required." : ""
+  );
+  const dueAtError = $derived(() => {
+    if (!touched.dueAt) {
+      return "";
+    }
+    if (!dueAt) {
+      return "Due date and time are required.";
+    }
+    const parsed = new Date(dueAt);
+    return Number.isNaN(parsed.getTime()) ? "Enter a valid date and time." : "";
+  });
+  const weekdaysError = $derived(() =>
+    touched.weekdays && frequencyType === "weekly" && weekdays.length === 0
+      ? "Select at least one weekday."
+      : ""
+  );
+  const dayOfMonthError = $derived(() =>
+    touched.dayOfMonth && frequencyType === "monthly" && (dayOfMonth < 1 || dayOfMonth > 31)
+      ? "Day of month must be between 1 and 31."
+      : ""
+  );
+  const hasErrors = $derived(
+    () => !!(nameError || dueAtError || weekdaysError || dayOfMonthError)
+  );
 
   // Initialize form from task
   $effect(() => {
@@ -48,6 +80,12 @@
       linkedBlockId = task.linkedBlockId || "";
       priority = task.priority || "normal";
       tags = task.tags ? task.tags.join(", ") : "";
+      touched = {
+        name: false,
+        dueAt: false,
+        weekdays: false,
+        dayOfMonth: false,
+      };
     } else {
       // Reset for new task
       name = "";
@@ -61,22 +99,25 @@
       linkedBlockId = "";
       priority = "normal";
       tags = "";
+      touched = {
+        name: false,
+        dueAt: false,
+        weekdays: false,
+        dayOfMonth: false,
+      };
     }
   });
 
   function handleSave() {
-    if (!name.trim()) {
-      toast.warning("Task name is required");
-      return;
-    }
+    touched = {
+      name: true,
+      dueAt: true,
+      weekdays: true,
+      dayOfMonth: true,
+    };
 
-    if (frequencyType === "weekly" && weekdays.length === 0) {
-      toast.warning("Select at least one weekday");
-      return;
-    }
-
-    if (frequencyType === "monthly" && (dayOfMonth < 1 || dayOfMonth > 31)) {
-      toast.warning("Day of month must be between 1 and 31");
+    if (hasErrors) {
+      toast.warning("Please fix the highlighted fields.");
       return;
     }
 
@@ -134,6 +175,7 @@
   }
 
   function toggleWeekday(day: number) {
+    touched.weekdays = true;
     if (weekdays.includes(day)) {
       weekdays = weekdays.filter((d) => d !== day);
     } else {
@@ -157,7 +199,14 @@
       type="text"
       bind:value={name}
       placeholder="Enter task name"
+      aria-invalid={!!nameError}
+      aria-describedby="task-name-error"
+      oninput={() => (touched.name = true)}
+      onblur={() => (touched.name = true)}
     />
+    {#if nameError}
+      <div class="task-form__error" id="task-name-error">{nameError}</div>
+    {/if}
   </div>
 
   <div class="task-form__field">
@@ -167,7 +216,14 @@
       class="task-form__input"
       type="datetime-local"
       bind:value={dueAt}
+      aria-invalid={!!dueAtError}
+      aria-describedby="task-due-error"
+      oninput={() => (touched.dueAt = true)}
+      onblur={() => (touched.dueAt = true)}
     />
+    {#if dueAtError}
+      <div class="task-form__error" id="task-due-error">{dueAtError}</div>
+    {/if}
   </div>
 
   <div class="task-form__field">
@@ -212,11 +268,16 @@
               ? 'task-form__weekday--active'
               : ''}"
             onclick={() => toggleWeekday(index)}
+            onblur={() => (touched.weekdays = true)}
+            type="button"
           >
             {day.slice(0, 3)}
           </button>
         {/each}
       </div>
+      {#if weekdaysError}
+        <div class="task-form__error">{weekdaysError}</div>
+      {/if}
     </div>
   {/if}
 
@@ -230,7 +291,14 @@
         min="1"
         max="31"
         bind:value={dayOfMonth}
+        aria-invalid={!!dayOfMonthError}
+        aria-describedby="task-day-error"
+        oninput={() => (touched.dayOfMonth = true)}
+        onblur={() => (touched.dayOfMonth = true)}
       />
+      {#if dayOfMonthError}
+        <div class="task-form__error" id="task-day-error">{dayOfMonthError}</div>
+      {/if}
     </div>
   {/if}
 
@@ -331,6 +399,12 @@
   .task-form__textarea:focus {
     outline: none;
     border-color: var(--b3-theme-primary);
+  }
+
+  .task-form__error {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--b3-theme-error);
   }
 
   .task-form__textarea {
