@@ -179,7 +179,7 @@
   }
 
   const weekdayNames = WEEKDAY_NAMES;
-  const weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+  const weekdayLabels = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 </script>
 
 <div class="task-form">
@@ -268,6 +268,7 @@
             type="button"
             aria-pressed={weekdays.includes(index)}
             aria-label={day}
+            title={day}
           >
             {weekdayLabels[index]}
           </button>
