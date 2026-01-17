@@ -15,6 +15,8 @@ export default defineConfig({
         { src: "plugin.json", dest: "./" },
         { src: "README.md", dest: "./" },
         { src: "icon.png", dest: "./" },
+        { src: "preview.png", dest: "./" },
+        { src: "assets", dest: "./" },
       ],
     }),
     ...(!isWatch
