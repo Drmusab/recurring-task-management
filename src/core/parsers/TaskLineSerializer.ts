@@ -79,16 +79,30 @@ export class TaskLineSerializer {
       if (task.recurrenceText) {
         parts.push(`[repeat:: ${task.recurrenceText}]`);
       }
-      if (task.dueAt) {
-        parts.push(`[due:: ${DateParser.toISODateString(new Date(task.dueAt))}]`);
+      if (task.id) {
+        parts.push(`[id:: ${task.id}]`);
       }
-      if (task.scheduledAt) {
-        parts.push(`[scheduled:: ${DateParser.toISODateString(new Date(task.scheduledAt))}]`);
+      if (task.dependsOn && task.dependsOn.length > 0) {
+        parts.push(`[dependsOn:: ${task.dependsOn.join(',')}]`);
+      }
+      if (task.createdAt && options.includeCreated) {
+        parts.push(`[created:: ${DateParser.toISODateString(new Date(task.createdAt))}]`);
       }
       if (task.startAt) {
         parts.push(`[start:: ${DateParser.toISODateString(new Date(task.startAt))}]`);
       }
-      // ... similar for other fields
+      if (task.scheduledAt) {
+        parts.push(`[scheduled:: ${DateParser.toISODateString(new Date(task.scheduledAt))}]`);
+      }
+      if (task.dueAt) {
+        parts.push(`[due:: ${DateParser.toISODateString(new Date(task.dueAt))}]`);
+      }
+      if (task.lastCompletedAt && task.status === 'done') {
+        parts.push(`[done:: ${DateParser.toISODateString(new Date(task.lastCompletedAt))}]`);
+      }
+      if (task.cancelledAt && task.status === 'cancelled') {
+        parts.push(`[cancelled:: ${DateParser.toISODateString(new Date(task.cancelledAt))}]`);
+      }
     }
 
     // Preserve unknown fields

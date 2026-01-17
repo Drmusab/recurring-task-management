@@ -150,7 +150,21 @@ export class TaskLineParser {
     }
 
     // Recurrence: 🔁 <rule>
-    const recurrenceMatch = content.match(new RegExp(`${EMOJI_SIGNIFIERS.recurrence}\\s*([^📅⏳🛫➕✅❌🔺⏫🔼🔽⏬🆔⛔🏁#]+)`));
+    // Match until we hit another emoji signifier or tag
+    const allEmojis = [
+      EMOJI_SIGNIFIERS.due,
+      EMOJI_SIGNIFIERS.scheduled,
+      EMOJI_SIGNIFIERS.start,
+      EMOJI_SIGNIFIERS.created,
+      EMOJI_SIGNIFIERS.done,
+      EMOJI_SIGNIFIERS.cancelled,
+      EMOJI_SIGNIFIERS.id,
+      EMOJI_SIGNIFIERS.dependsOn,
+      EMOJI_SIGNIFIERS.onCompletion,
+      ...Object.values(EMOJI_SIGNIFIERS.priority),
+    ];
+    const emojiPattern = allEmojis.map(e => e.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const recurrenceMatch = content.match(new RegExp(`${EMOJI_SIGNIFIERS.recurrence}\\s*([^${emojiPattern}#]+)`));
     if (recurrenceMatch) {
       metadata.recurrenceText = recurrenceMatch[1].trim();
       description = description.replace(recurrenceMatch[0], '');
