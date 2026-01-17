@@ -87,6 +87,35 @@ export interface Task {
   
   /** Last update timestamp (ISO string) */
   updatedAt: string;
+
+  // New fields for Obsidian-Tasks feature parity
+  
+  /** Task status (replaces boolean 'enabled' semantically) */
+  status?: 'todo' | 'done' | 'cancelled';
+  
+  /** Human-readable recurrence string */
+  recurrenceText?: string;
+  
+  /** When to start working on task (ISO string) */
+  scheduledAt?: string;
+  
+  /** Earliest date task can begin (ISO string) */
+  startAt?: string;
+  
+  /** Task IDs this task depends on */
+  dependsOn?: string[];
+  
+  /** Task IDs blocking this task */
+  blockedBy?: string[];
+  
+  /** Links recurring task instances */
+  seriesId?: string;
+  
+  /** Which instance in recurring series */
+  occurrenceIndex?: number;
+  
+  /** Cancellation timestamp (ISO string) */
+  cancelledAt?: string;
 }
 
 /**
@@ -246,4 +275,40 @@ export function calculateTaskHealth(task: Task): number {
   score += streakBonus;
   
   return Math.round(Math.min(100, score));
+}
+
+/**
+ * Check if task is blocked by dependencies
+ */
+export function isBlocked(task: Task, allTasks: Task[]): boolean {
+  if (!task.blockedBy || task.blockedBy.length === 0) {
+    return false;
+  }
+  
+  // Check if any blocking task is not completed
+  const blockingTasks = allTasks.filter(t => task.blockedBy?.includes(t.id));
+  return blockingTasks.some(t => t.status !== 'done' && t.enabled);
+}
+
+/**
+ * Check if task is overdue
+ */
+export function isOverdue(task: Task): boolean {
+  const now = new Date();
+  const dueDate = new Date(task.dueAt);
+  return dueDate < now && task.status !== 'done' && task.status !== 'cancelled';
+}
+
+/**
+ * Check if task is due today
+ */
+export function isDueToday(task: Task): boolean {
+  const now = new Date();
+  const dueDate = new Date(task.dueAt);
+  
+  return (
+    dueDate.getFullYear() === now.getFullYear() &&
+    dueDate.getMonth() === now.getMonth() &&
+    dueDate.getDate() === now.getDate()
+  );
 }
