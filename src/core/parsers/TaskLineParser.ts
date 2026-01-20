@@ -52,7 +52,11 @@ export class TaskLineParser {
       };
     }
 
-    // Check global filter FIRST
+    const indent = checkboxMatch[1];
+    const statusSymbol = checkboxMatch[2];
+    let content = checkboxMatch[3];
+
+    // Check global filter AFTER extracting status symbol for better debugging
     if (!this.globalFilter.shouldTreatAsTask(line, filePath)) {
       return {
         task: null,
@@ -61,14 +65,10 @@ export class TaskLineParser {
         error: 'Excluded by global filter',
         unknownFields: [],
         originalLine,
-        statusSymbol: '',
-        description: '',
+        statusSymbol,  // Now includes actual status symbol
+        description: content.trim(),
       };
     }
-
-    const indent = checkboxMatch[1];
-    const statusSymbol = checkboxMatch[2];
-    let content = checkboxMatch[3];
 
     const status = this.registry.get(statusSymbol);
     const task: Partial<Task> = {

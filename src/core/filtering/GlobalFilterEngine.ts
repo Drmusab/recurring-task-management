@@ -91,7 +91,7 @@ export class GlobalFilterEngine {
    * Extract tags from content
    */
   private extractTags(content: string): string[] {
-    const tagMatches = content.match(/#[\w\/-]+/g);
+    const tagMatches = content.match(/#[\w/-]+/g);
     return tagMatches || [];
   }
 }

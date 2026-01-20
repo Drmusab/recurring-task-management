@@ -53,8 +53,13 @@ export function validateFilterRule(rule: FilterRule): { valid: boolean; error?: 
  * Create a new filter rule
  */
 export function createFilterRule(type: FilterRuleType, pattern: string, description?: string): FilterRule {
+  // Use crypto.randomUUID() if available, fallback to timestamp-based ID
+  const id = typeof crypto !== 'undefined' && crypto.randomUUID 
+    ? `rule_${crypto.randomUUID()}`
+    : `rule_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    
   return {
-    id: `rule_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+    id,
     type,
     pattern,
     enabled: true,
