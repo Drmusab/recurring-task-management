@@ -5,6 +5,7 @@
 import type { Task } from "@/core/models/Task";
 import type { TaskRepositoryProvider } from "@/core/storage/TaskRepository";
 import type { RecurrenceEngine } from "@/core/engine/RecurrenceEngine";
+import type { PluginSettings } from "@/core/settings/PluginSettings";
 import { StatusRegistry } from "@/core/models/StatusRegistry";
 import { pluginEventBus } from "@/core/events/PluginEventBus";
 import * as logger from "@/utils/logger";
@@ -13,7 +14,8 @@ import { toast } from "@/utils/notifications";
 export class TaskCommands {
   constructor(
     private repository: TaskRepositoryProvider,
-    private recurrenceEngine?: RecurrenceEngine
+    private recurrenceEngine?: RecurrenceEngine,
+    private getSettings?: () => PluginSettings
   ) {}
 
   /**
@@ -38,7 +40,12 @@ export class TaskCommands {
       // Update status field based on type
       if (newStatus.type === "DONE") {
         updatedTask.status = "done";
-        updatedTask.doneAt = new Date().toISOString();
+        
+        // Auto-add done date if enabled in settings
+        const settings = this.getSettings?.();
+        if (settings?.dates.autoAddDone && !updatedTask.doneAt) {
+          updatedTask.doneAt = new Date().toISOString();
+        }
         
         // Handle recurrence if needed
         if (task.frequency && this.recurrenceEngine) {
@@ -46,7 +53,12 @@ export class TaskCommands {
         }
       } else if (newStatus.type === "CANCELLED") {
         updatedTask.status = "cancelled";
-        updatedTask.cancelledAt = new Date().toISOString();
+        
+        // Auto-add cancelled date if enabled in settings
+        const settings = this.getSettings?.();
+        if (settings?.dates.autoAddCancelled && !updatedTask.cancelledAt) {
+          updatedTask.cancelledAt = new Date().toISOString();
+        }
       } else if (newStatus.type === "TODO") {
         updatedTask.status = "todo";
       }
@@ -74,8 +86,13 @@ export class TaskCommands {
       const updatedTask = {
         ...task,
         status: "done" as const,
-        doneAt: new Date().toISOString(),
       };
+      
+      // Auto-add done date if enabled in settings
+      const settings = this.getSettings?.();
+      if (settings?.dates.autoAddDone && !updatedTask.doneAt) {
+        updatedTask.doneAt = new Date().toISOString();
+      }
 
       await this.repository.saveTask(updatedTask);
       
