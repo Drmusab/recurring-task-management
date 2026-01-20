@@ -22,7 +22,7 @@
   import UpcomingTab from "./tabs/UpcomingTab.svelte";
   import DoneTab from "./tabs/DoneTab.svelte";
   import ProjectsTab from "./tabs/ProjectsTab.svelte";
-  import SearchTab from "./tabs/SearchTab.svelte";
+  import SearchTab from "./tabs/SearchTab. svelte";
   import TaskEditorModal from "./TaskEditorModal.svelte";
   import Settings from "./settings/Settings.svelte";
 
@@ -35,8 +35,9 @@
   let { repository, scheduler, eventService }: Props = $props();
 
   // Get timezone handler and recurrence engine from scheduler
-  const timezoneHandler = $derived(scheduler.getTimezoneHandler());
-  const recurrenceEngine = $derived(scheduler.getRecurrenceEngine());
+  // These are simple getters, not reactive state - no need for $derived
+  const timezoneHandler = scheduler.getTimezoneHandler();
+  const recurrenceEngine = scheduler.getRecurrenceEngine();
 
   type TabType = "inbox" | "today" | "upcoming" | "done" | "projects" | "search" | "all" | "timeline" | "analytics";
   let activeTab = $state<TabType>("today");
@@ -52,7 +53,7 @@
   let todayTasks = $derived(getTodayAndOverdueTasks(allTasks));
   let isRefreshing = $state(false);
   const panelLabelId = $derived(
-    ["inbox", "today", "upcoming", "done", "projects", "search", "all"].includes(activeTab)
+    ["inbox", "today", "upcoming", "done", "projects", "search", "all"]. includes(activeTab)
       ? `dashboard-tab-${activeTab}`
       : undefined
   );
@@ -70,12 +71,12 @@
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
       tasks = tasks.filter((t) => {
-        if (!t.dueAt) return false;
+        if (! t.dueAt) return false;
         const due = new Date(t.dueAt);
         return due >= today && due < tomorrow;
       });
     }
-    if (quickFilters.has("overdue")) {
+    if (quickFilters. has("overdue")) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       tasks = tasks.filter((t) => {
@@ -85,10 +86,10 @@
       });
     }
     if (quickFilters.has("inProgress")) {
-      tasks = tasks.filter((t) => t.status === "todo" && t.statusSymbol && t.statusSymbol !== " ");
+      tasks = tasks. filter((t) => t.status === "todo" && t.statusSymbol && t.statusSymbol !== " ");
     }
     if (quickFilters.has("blocked")) {
-      tasks = tasks.filter((t) => t.blockedBy && t.blockedBy.length > 0);
+      tasks = tasks. filter((t) => t.blockedBy && t.blockedBy.length > 0);
     }
     if (quickFilters.has("highPriority")) {
       tasks = tasks.filter((t) => t.priority === "high" || t.priority === "urgent");
@@ -102,9 +103,9 @@
     allTasks.filter(
       (t) =>
         t.status !== "done" &&
-        t.status !== "cancelled" &&
-        !t.dueAt &&
-        !t.scheduledAt &&
+        t. status !== "cancelled" &&
+        ! t. dueAt &&
+        !t. scheduledAt &&
         !t.startAt
     ).length
   );
@@ -115,7 +116,7 @@
     const futureDate = new Date(today);
     futureDate.setDate(futureDate.getDate() + 7);
     return allTasks.filter((t) => {
-      if (t.status === "done" || t.status === "cancelled" || !t.dueAt) return false;
+      if (t.status === "done" || t.status === "cancelled" || ! t.dueAt) return false;
       const due = new Date(t.dueAt);
       due.setHours(0, 0, 0, 0);
       return due > today && due <= futureDate;
@@ -126,8 +127,8 @@
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
     cutoff.setHours(0, 0, 0, 0);
-    return allTasks.filter((t) => {
-      if (t.status !== "done" || !t.doneAt) return false;
+    return allTasks. filter((t) => {
+      if (t.status !== "done" || ! t.doneAt) return false;
       const done = new Date(t.doneAt);
       return done >= cutoff;
     }).length;
@@ -140,7 +141,7 @@
   // Refresh tasks from storage (initial load / explicit reloads only)
   function loadTasksFromStorage(reason: "initial" | "reload" | "external" = "initial") {
     isRefreshing = true;
-    // Shallow copy keeps UI state decoupled from storage while avoiding deep clones.
+    // Shallow copy keeps UI state decoupled from storage while avoiding deep clones. 
     allTasks = repository.getAllTasks().map((task) => ({ ...task }));
     isRefreshing = false;
     if (reason !== "initial") {
@@ -160,7 +161,7 @@
   });
 
   async function handleTaskDone(task: Task) {
-    pluginEventBus.emit("task:complete", { taskId: task.id });
+    pluginEventBus.emit("task: complete", { taskId: task.id });
   }
 
   async function handleTaskDelay(task: Task) {
@@ -170,7 +171,7 @@
       const currentDue = new Date(nextTask.dueAt);
       const tomorrow = timezoneHandler.tomorrow();
       tomorrow.setHours(currentDue.getHours(), currentDue.getMinutes(), 0, 0);
-      nextTask.dueAt = tomorrow.toISOString();
+      nextTask.dueAt = tomorrow. toISOString();
       nextTask.snoozeCount = (nextTask.snoozeCount || 0) + 1;
       nextTask.updatedAt = new Date().toISOString();
       return nextTask;
@@ -180,18 +181,18 @@
     toast.info(`Task "${task.name}" delayed to tomorrow`);
 
     try {
-      await eventService.emitTaskEvent("task.snoozed", task);
+      await eventService.emitTaskEvent("task. snoozed", task);
       await scheduler.delayToTomorrow(task.id);
     } catch (err) {
       allTasks = previousTasks;
-      toast.error("Failed to delay task: " + err);
+      toast.error("Failed to delay task:  " + err);
       loadTasksFromStorage("external");
     }
   }
 
   async function handleSaveTask(task: Task) {
     // Add validation
-    if (!task.name?.trim()) {
+    if (!task.name?. trim()) {
       toast.error("Task name is required");
       return;
     }
@@ -214,7 +215,7 @@
 
   async function handleDeleteTask(task: Task) {
     const previousTasks = allTasks;
-    allTasks = removeTask(allTasks, task.id);
+    allTasks = removeTask(allTasks, task. id);
     
     const undoTimeout = window.setTimeout(async () => {
       try {
@@ -231,7 +232,7 @@
       type: "success",
       duration: 5000,
       actionLabel: "Undo",
-      onAction: () => {
+      onAction:  () => {
         window.clearTimeout(undoTimeout);
         allTasks = previousTasks;
         toast.info(`Restored "${task.name}"`);
@@ -241,7 +242,7 @@
   }
 
   async function handleDuplicateTask(task: Task) {
-    const duplicateName = task.name.endsWith(" (copy)")
+    const duplicateName = task.name. endsWith(" (copy)")
       ? `${task.name} ${new Date().toLocaleDateString()}`
       : `${task.name} (copy)`;
     const duplicated = duplicateTask(task, {
@@ -303,15 +304,15 @@
 
     const previousTasks = allTasks;
     const taskIdSet = new Set(taskIds);
-    const tasksToDelete = allTasks.filter((task) => taskIdSet.has(task.id));
+    const tasksToDelete = allTasks. filter((task) => taskIdSet.has(task.id));
     allTasks = allTasks.filter((task) => !taskIdSet.has(task.id));
 
     const undoTimeout = window.setTimeout(async () => {
       try {
-        await Promise.all(tasksToDelete.map((task) => repository.deleteTask(task.id)));
+        await Promise.all(tasksToDelete.map((task) => repository.deleteTask(task. id)));
       } catch (err) {
         allTasks = previousTasks;
-        toast.error("Failed to delete tasks: " + err);
+        toast. error("Failed to delete tasks: " + err);
         loadTasksFromStorage("external");
       }
     }, 5000);
@@ -322,7 +323,7 @@
       duration: 5000,
       actionLabel: "Undo",
       onAction: () => {
-        window.clearTimeout(undoTimeout);
+        window. clearTimeout(undoTimeout);
         allTasks = previousTasks;
         toast.info("Bulk delete undone");
       },
@@ -425,7 +426,7 @@
     <div class="dashboard__overlay">
       <Settings {eventService} onClose={handleCloseSettings} />
     </div>
-  {:else if showTaskForm}
+  {: else if showTaskForm}
     <div class="dashboard__overlay">
       <TaskEditorModal task={editingTask} {repository} onSave={handleSaveTask} onClose={handleCancelForm} />
     </div>
@@ -459,7 +460,7 @@
       </button>
       <button
         id="dashboard-tab-upcoming"
-        class="dashboard__tab {activeTab === 'upcoming' ? 'active' : ''}"
+        class="dashboard__tab {activeTab === 'upcoming' ?  'active' : ''}"
         role="tab"
         aria-selected={activeTab === "upcoming"}
         aria-controls="dashboard-panel"
@@ -521,7 +522,7 @@
 
     {#if activeTab !== "search" && activeTab !== "timeline" && activeTab !== "analytics"}
       <div class="dashboard__filters">
-        <span class="dashboard__filters-label">Quick Filters:</span>
+        <span class="dashboard__filters-label">Quick Filters: </span>
         <button
           class="dashboard__filter-btn {quickFilters.has('notDone') ? 'active' : ''}"
           onclick={() => toggleQuickFilter('notDone')}
@@ -529,7 +530,7 @@
           Not Done
         </button>
         <button
-          class="dashboard__filter-btn {quickFilters.has('dueToday') ? 'active' : ''}"
+          class="dashboard__filter-btn {quickFilters. has('dueToday') ? 'active' : ''}"
           onclick={() => toggleQuickFilter('dueToday')}
         >
           Due Today
@@ -547,7 +548,7 @@
           In Progress
         </button>
         <button
-          class="dashboard__filter-btn {quickFilters.has('blocked') ? 'active' : ''}"
+          class="dashboard__filter-btn {quickFilters. has('blocked') ? 'active' : ''}"
           onclick={() => toggleQuickFilter('blocked')}
         >
           Blocked
@@ -576,7 +577,7 @@
         />
       {:else if activeTab === "today"}
         <TodayTab
-          tasks={quickFilters.size > 0 ? filteredTasks.filter(t => todayTasks.some(tt => tt.id === t.id)) : todayTasks}
+          tasks={quickFilters.size > 0 ? filteredTasks. filter(t => todayTasks.some(tt => tt.id === t.id)) : todayTasks}
           onDone={handleTaskDone}
           onDelay={handleTaskDelay}
           onSkip={handleTaskSkip}
@@ -585,7 +586,7 @@
         />
       {:else if activeTab === "upcoming"}
         <UpcomingTab
-          tasks={quickFilters.size > 0 ? filteredTasks : allTasks}
+          tasks={quickFilters.size > 0 ?  filteredTasks :  allTasks}
           onEdit={handleEditTask}
           onDone={handleTaskDone}
           onDelete={handleDeleteTask}
@@ -597,7 +598,7 @@
           onDelete={handleDeleteTask}
           onUncomplete={handleUncompleteTask}
         />
-      {:else if activeTab === "projects"}
+      {: else if activeTab === "projects"}
         <ProjectsTab
           tasks={quickFilters.size > 0 ? filteredTasks : allTasks}
           onEdit={handleEditTask}
@@ -623,7 +624,7 @@
           onBulkDelete={handleBulkDelete}
           onCreate={handleCreateTask}
         />
-      {:else if activeTab === "timeline"}
+      {: else if activeTab === "timeline"}
         <TimelineTab
           tasks={allTasks}
           {recurrenceEngine}
@@ -640,7 +641,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: var(--b3-theme-background);
+    background:  var(--b3-theme-background);
   }
 
   .dashboard__header {
@@ -648,14 +649,14 @@
     justify-content: space-between;
     align-items: center;
     padding: 16px 20px;
-    border-bottom: 1px solid var(--b3-border-color);
+    border-bottom:  1px solid var(--b3-border-color);
     background: var(--b3-theme-surface);
   }
 
   .dashboard__title {
     margin: 0;
     font-size: 18px;
-    font-weight: 600;
+    font-weight:  600;
     color: var(--b3-theme-on-surface);
   }
 
@@ -676,7 +677,7 @@
     transition: background 0.2s;
   }
 
-  .dashboard__refresh-btn:hover:not(:disabled) {
+  .dashboard__refresh-btn:hover: not(:disabled) {
     background: var(--b3-theme-surface-light);
   }
 
@@ -749,8 +750,8 @@
     background: var(--b3-theme-primary);
     color: white;
     border-radius: 10px;
-    font-size: 11px;
-    font-weight: 600;
+    font-size:  11px;
+    font-weight:  600;
   }
 
   .dashboard__filters {
@@ -782,10 +783,10 @@
   }
 
   .dashboard__filter-btn:hover {
-    background: var(--b3-theme-surface-light);
+    background:  var(--b3-theme-surface-light);
   }
 
-  .dashboard__filter-btn.active {
+  .dashboard__filter-btn. active {
     background: var(--b3-theme-primary);
     color: white;
     border-color: var(--b3-theme-primary);
