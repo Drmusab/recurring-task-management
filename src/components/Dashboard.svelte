@@ -22,7 +22,7 @@
   import UpcomingTab from "./tabs/UpcomingTab.svelte";
   import DoneTab from "./tabs/DoneTab.svelte";
   import ProjectsTab from "./tabs/ProjectsTab.svelte";
-  import SearchTab from "./tabs/SearchTab. svelte";
+  import SearchTab from "./tabs/SearchTab.svelte";
   import TaskEditorModal from "./TaskEditorModal.svelte";
   import Settings from "./settings/Settings.svelte";
 
@@ -677,7 +677,7 @@
     transition: background 0.2s;
   }
 
-  .dashboard__refresh-btn:hover: not(:disabled) {
+  .dashboard__refresh-btn:hover:not(:disabled) {
     background: var(--b3-theme-surface-light);
   }
 
@@ -786,7 +786,7 @@
     background:  var(--b3-theme-surface-light);
   }
 
-  .dashboard__filter-btn. active {
+  .dashboard__filter-btn.active {
     background: var(--b3-theme-primary);
     color: white;
     border-color: var(--b3-theme-primary);
