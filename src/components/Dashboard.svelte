@@ -426,7 +426,7 @@
     <div class="dashboard__overlay">
       <Settings {eventService} onClose={handleCloseSettings} />
     </div>
-  {: else if showTaskForm}
+  {:else if showTaskForm}
     <div class="dashboard__overlay">
       <TaskEditorModal task={editingTask} {repository} onSave={handleSaveTask} onClose={handleCancelForm} />
     </div>
@@ -598,7 +598,7 @@
           onDelete={handleDeleteTask}
           onUncomplete={handleUncompleteTask}
         />
-      {: else if activeTab === "projects"}
+      {:else if activeTab === "projects"}
         <ProjectsTab
           tasks={quickFilters.size > 0 ? filteredTasks : allTasks}
           onEdit={handleEditTask}
@@ -624,7 +624,7 @@
           onBulkDelete={handleBulkDelete}
           onCreate={handleCreateTask}
         />
-      {: else if activeTab === "timeline"}
+      {:else if activeTab === "timeline"}
         <TimelineTab
           tasks={allTasks}
           {recurrenceEngine}
