@@ -108,13 +108,14 @@ export class QueryParser {
     }
     
     // Check for boolean operators (after simple keywords)
-    if (line.includes(' AND ') || line.includes(' and ')) {
+    // Use regex for more robust case-insensitive matching
+    if (/\s+(and|AND)\s+/i.test(line)) {
       return this.parseAndFilter(line);
     }
-    if (line.includes(' OR ') || line.includes(' or ')) {
+    if (/\s+(or|OR)\s+/i.test(line)) {
       return this.parseOrFilter(line);
     }
-    if (line.startsWith('NOT ') || line.startsWith('not ')) {
+    if (/^(not|NOT)\s+/i.test(line)) {
       return this.parseNotFilter(line);
     }
 
@@ -353,8 +354,8 @@ export class QueryParser {
   }
 
   private parseAndFilter(line: string): FilterNode {
-    // Split by both uppercase and lowercase AND
-    const parts = line.split(/ AND | and /);
+    // Split by case-insensitive AND
+    const parts = line.split(/\s+(and|AND)\s+/i).filter((_, i) => i % 2 === 0); // Remove the captured "and" parts
     const filters = parts.map(p => this.parseFilterInstruction(p.trim())).filter(f => f !== null) as FilterNode[];
     
     if (filters.length === 0) {
@@ -386,8 +387,8 @@ export class QueryParser {
   }
 
   private parseOrFilter(line: string): FilterNode {
-    // Split by both uppercase and lowercase OR
-    const parts = line.split(/ OR | or /);
+    // Split by case-insensitive OR
+    const parts = line.split(/\s+(or|OR)\s+/i).filter((_, i) => i % 2 === 0); // Remove the captured "or" parts
     const filters = parts.map(p => this.parseFilterInstruction(p.trim())).filter(f => f !== null) as FilterNode[];
     
     if (filters.length === 0) {

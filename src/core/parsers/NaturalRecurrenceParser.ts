@@ -215,13 +215,16 @@ export class NaturalRecurrenceParser {
               } else if (wd && typeof wd.weekday === 'number') {
                 return wd.weekday;
               }
-              return 0;
+              // Log warning for unexpected weekday format
+              console.warn('Unexpected weekday format in rrule:', wd);
+              return null;
             })
-            .filter((wd: number) => wd >= 0 && wd <= 6) 
+            .filter((wd: number | null) => wd !== null && wd >= 0 && wd <= 6) 
           : [new Date().getDay()]; // Default to today's weekday
 
         // Ensure we have at least one weekday
         if (weekdays.length === 0) {
+          console.warn('No valid weekdays found in rrule, defaulting to Monday');
           weekdays.push(0); // Default to Monday
         }
 

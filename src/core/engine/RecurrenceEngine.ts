@@ -149,9 +149,8 @@ export class RecurrenceEngine {
           rruleString: frequency.rruleString,
           baseDate: baseDate.toISOString()
         });
-        // Remove rruleString to prevent infinite recursion
-        const legacyFrequency = { ...frequency };
-        delete legacyFrequency.rruleString;
+        // Create a new frequency object without rruleString
+        const { rruleString, naturalLanguage, ...legacyFrequency } = frequency as any;
         return this.calculateNext(baseDate, legacyFrequency as Frequency, options);
       }
 
@@ -180,9 +179,8 @@ export class RecurrenceEngine {
         rruleString: frequency.rruleString
       });
       
-      // Remove rruleString to prevent infinite recursion
-      const legacyFrequency = { ...frequency };
-      delete legacyFrequency.rruleString;
+      // Create a new frequency object without rruleString
+      const { rruleString, naturalLanguage, ...legacyFrequency } = frequency as any;
       return this.calculateNext(currentDue, legacyFrequency as Frequency, options);
     }
   }

@@ -11,25 +11,27 @@ export class DescriptionFilter extends Filter {
   }
 
   matches(task: Task): boolean {
-    // Search in task name (main text)
-    const searchText = task.name || '';
+    // Search in both task name and description field
+    const taskName = task.name || '';
+    const taskDescription = task.description || '';
+    const combinedText = `${taskName} ${taskDescription}`.trim();
     
     switch (this.operator) {
       case 'includes': {
         const needle = this.caseSensitive ? this.pattern : this.pattern.toLowerCase();
-        const haystack = this.caseSensitive ? searchText : searchText.toLowerCase();
+        const haystack = this.caseSensitive ? combinedText : combinedText.toLowerCase();
         return haystack.includes(needle);
       }
       case 'does not include': {
         const needle = this.caseSensitive ? this.pattern : this.pattern.toLowerCase();
-        const haystack = this.caseSensitive ? searchText : searchText.toLowerCase();
+        const haystack = this.caseSensitive ? combinedText : combinedText.toLowerCase();
         return !haystack.includes(needle);
       }
       case 'regex': {
         try {
           const flags = this.caseSensitive ? '' : 'i';
           const regex = new RegExp(this.pattern, flags);
-          return regex.test(searchText);
+          return regex.test(combinedText);
         } catch {
           return false;
         }
