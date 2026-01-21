@@ -99,12 +99,24 @@ export class QueryParser {
   }
 
   private parseFilterInstruction(line: string): FilterNode | null {
-    // Handle simple keywords
+    // Handle simple keywords first (before checking for boolean operators)
     if (line === 'done') {
       return { type: 'done', operator: 'is', value: true };
     }
     if (line === 'not done') {
       return { type: 'done', operator: 'is', value: false };
+    }
+    
+    // Check for boolean operators (after simple keywords)
+    // Use regex for more robust case-insensitive matching
+    if (/\s+(and|AND)\s+/i.test(line)) {
+      return this.parseAndFilter(line);
+    }
+    if (/\s+(or|OR)\s+/i.test(line)) {
+      return this.parseOrFilter(line);
+    }
+    if (/^(not|NOT)\s+/i.test(line)) {
+      return this.parseNotFilter(line);
     }
 
     // Status filters
@@ -339,5 +351,103 @@ export class QueryParser {
       return str.slice(1, -1);
     }
     return str;
+  }
+
+  private parseAndFilter(line: string): FilterNode {
+    // Split by case-insensitive AND
+    const parts = line.split(/\s+(and|AND)\s+/i).filter((_, i) => i % 2 === 0); // Remove the captured "and" parts
+    const filters = parts.map(p => this.parseFilterInstruction(p.trim())).filter(f => f !== null) as FilterNode[];
+    
+    if (filters.length === 0) {
+      throw new QuerySyntaxError(
+        'Empty AND expression',
+        this.line,
+        this.column,
+        'AND must have filters on both sides'
+      );
+    }
+    
+    if (filters.length === 1) {
+      return filters[0];
+    }
+    
+    // Build left-associative tree: (a AND b) AND c
+    let result = filters[0];
+    for (let i = 1; i < filters.length; i++) {
+      result = {
+        type: 'boolean',
+        operator: 'AND',
+        value: null,
+        left: result,
+        right: filters[i],
+      };
+    }
+    
+    return result;
+  }
+
+  private parseOrFilter(line: string): FilterNode {
+    // Split by case-insensitive OR
+    const parts = line.split(/\s+(or|OR)\s+/i).filter((_, i) => i % 2 === 0); // Remove the captured "or" parts
+    const filters = parts.map(p => this.parseFilterInstruction(p.trim())).filter(f => f !== null) as FilterNode[];
+    
+    if (filters.length === 0) {
+      throw new QuerySyntaxError(
+        'Empty OR expression',
+        this.line,
+        this.column,
+        'OR must have filters on both sides'
+      );
+    }
+    
+    if (filters.length === 1) {
+      return filters[0];
+    }
+    
+    // Build left-associative tree: (a OR b) OR c
+    let result = filters[0];
+    for (let i = 1; i < filters.length; i++) {
+      result = {
+        type: 'boolean',
+        operator: 'OR',
+        value: null,
+        left: result,
+        right: filters[i],
+      };
+    }
+    
+    return result;
+  }
+
+  private parseNotFilter(line: string): FilterNode {
+    // Remove NOT or not prefix
+    const cleanLine = line.replace(/^NOT\s+/i, '').trim();
+    
+    if (!cleanLine) {
+      throw new QuerySyntaxError(
+        'Empty NOT expression',
+        this.line,
+        this.column,
+        'NOT must have a filter after it'
+      );
+    }
+    
+    const inner = this.parseFilterInstruction(cleanLine);
+    
+    if (!inner) {
+      throw new QuerySyntaxError(
+        'Invalid filter after NOT',
+        this.line,
+        this.column,
+        'NOT must be followed by a valid filter'
+      );
+    }
+    
+    return {
+      type: 'boolean',
+      operator: 'NOT',
+      value: null,
+      inner,
+    };
   }
 }
