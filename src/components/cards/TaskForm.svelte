@@ -12,6 +12,7 @@
     loadTaskTemplates,
     saveTaskTemplate,
   } from "@/utils/taskTemplates";
+  import DateInput from "@/components/ui/DateInput.svelte";
 
   interface Props {
     task?: Task;
@@ -146,8 +147,8 @@
     if (task) {
       name = task.name || "";
       dueAt = task.dueAt
-        ? new Date(task.dueAt).toISOString().slice(0, 16)
-        : new Date().toISOString().slice(0, 16);
+        ? task.dueAt  // Already in ISO format, DateInput will handle it
+        : new Date().toISOString();
       frequencyType = task.frequency.type || "daily";
       interval = task.frequency.interval || 1;
       time = task.frequency.time || "09:00";
@@ -176,7 +177,7 @@
     } else {
       // Reset for new task
       name = "";
-      dueAt = new Date().toISOString().slice(0, 16);
+      dueAt = new Date().toISOString();
       frequencyType = "daily";
       interval = 1;
       time = "09:00";
@@ -411,20 +412,14 @@
   </div>
 
   <div class="task-form__field">
-    <label class="task-form__label" for="task-due">Due Date & Time *</label>
-    <input
-      id="task-due"
-      class="task-form__input"
-      type="datetime-local"
+    <DateInput
       bind:value={dueAt}
-      aria-invalid={!!dueAtError}
-      aria-describedby="task-due-error"
-      oninput={() => (touched.dueAt = true)}
-      onblur={() => (touched.dueAt = true)}
+      label="Due Date & Time *"
+      placeholder="e.g., tomorrow at 9am, next Friday"
+      showTime={true}
+      required={true}
+      error={dueAtError}
     />
-    {#if dueAtError}
-      <div class="task-form__error" id="task-due-error">{dueAtError}</div>
-    {/if}
   </div>
 
   <div class="task-form__field">
