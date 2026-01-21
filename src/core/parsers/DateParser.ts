@@ -1,6 +1,5 @@
 import * as chrono from 'chrono-node';
-import { getUserTimezone } from '@/utils/timezone';
-import { formatDateTime, setTime, endOfDay, addDays, addWeeks } from '@/utils/date';
+import { setTime, addDays } from '@/utils/date';
 
 export interface ParsedDate {
   date: Date | null;
@@ -272,10 +271,10 @@ export class DateParser {
     for (let i = 0; i < dayNames.length; i++) {
       const dayName = dayNames[i];
       if (!input || dayName.toLowerCase().includes(input) || `next ${dayName}`.toLowerCase().includes(input)) {
-        const currentDay = today.getDay();
-        const targetDay = i; // Monday = 0 in our array, but Sunday = 0 in Date.getDay()
-        const adjustedTargetDay = (targetDay + 1) % 7; // Convert our index to Date.getDay() format
-        let daysToAdd = adjustedTargetDay - currentDay;
+        const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+        // Convert our array index (0=Monday, 1=Tuesday, ..., 6=Sunday) to Date.getDay() format
+        const targetDay = i === 6 ? 0 : i + 1; // Map: 0->1(Mon), 1->2(Tue), ..., 5->6(Sat), 6->0(Sun)
+        let daysToAdd = targetDay - currentDay;
         if (daysToAdd <= 0) daysToAdd += 7;
         
         const date = addDays(today, daysToAdd);
@@ -408,8 +407,20 @@ export class DateParser {
       
       case 'eow': {
         // End of week - Friday 5:00 PM
-        const currentDay = today.getDay();
-        const daysUntilFriday = currentDay <= 5 ? 5 - currentDay : 7 - currentDay + 5;
+        const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 5 = Friday, 6 = Saturday
+        let daysUntilFriday;
+        
+        if (currentDay === 0) {
+          // Sunday -> 5 days to Friday
+          daysUntilFriday = 5;
+        } else if (currentDay <= 5) {
+          // Monday to Friday -> days until Friday (0 if already Friday)
+          daysUntilFriday = 5 - currentDay;
+        } else {
+          // Saturday -> 6 days to next Friday
+          daysUntilFriday = 6;
+        }
+        
         const friday = addDays(today, daysUntilFriday);
         return setTime(friday, 17, 0);
       }

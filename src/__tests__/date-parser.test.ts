@@ -478,4 +478,74 @@ describe('DateParser', () => {
       expect(DateParser.parseTime('')).toBeNull();
     });
   });
+
+  describe('Day name calculations', () => {
+    it('should correctly calculate Monday from Monday (reference date)', () => {
+      // Reference date is Monday, Jan 15, 2024
+      const suggestions = DateParser.getDateSuggestions('monday', referenceDate);
+      const mondaySuggestion = suggestions.find(s => s.text === 'Monday');
+      expect(mondaySuggestion).toBeDefined();
+      
+      // Next Monday should be 7 days from now (Jan 22, 2024)
+      const nextMonday = new Date(mondaySuggestion!.value);
+      expect(nextMonday.toISOString().split('T')[0]).toBe('2024-01-22');
+    });
+
+    it('should correctly calculate Friday from Monday (reference date)', () => {
+      const suggestions = DateParser.getDateSuggestions('friday', referenceDate);
+      const fridaySuggestion = suggestions.find(s => s.text === 'Friday');
+      expect(fridaySuggestion).toBeDefined();
+      
+      // Next Friday should be 4 days from Monday (Jan 19, 2024)
+      const nextFriday = new Date(fridaySuggestion!.value);
+      expect(nextFriday.toISOString().split('T')[0]).toBe('2024-01-19');
+    });
+
+    it('should correctly calculate Sunday from Monday (reference date)', () => {
+      const suggestions = DateParser.getDateSuggestions('sunday', referenceDate);
+      const sundaySuggestion = suggestions.find(s => s.text === 'Sunday');
+      expect(sundaySuggestion).toBeDefined();
+      
+      // Next Sunday should be 6 days from Monday (Jan 21, 2024)
+      const nextSunday = new Date(sundaySuggestion!.value);
+      expect(nextSunday.toISOString().split('T')[0]).toBe('2024-01-21');
+    });
+  });
+
+  describe('EOW calculations', () => {
+    it('should calculate EOW from Monday correctly', () => {
+      // Reference is Monday, Jan 15
+      const result = DateParser.parseNaturalLanguageDate('eow', referenceDate);
+      expect(result).not.toBeNull();
+      expect(result!.toISOString().split('T')[0]).toBe('2024-01-19'); // Friday
+      expect(result!.getHours()).toBe(17);
+    });
+
+    it('should calculate EOW from Friday correctly', () => {
+      // Friday, Jan 19
+      const friday = new Date('2024-01-19T12:00:00Z');
+      const result = DateParser.parseNaturalLanguageDate('eow', friday);
+      expect(result).not.toBeNull();
+      expect(result!.toISOString().split('T')[0]).toBe('2024-01-19'); // Same Friday
+      expect(result!.getHours()).toBe(17);
+    });
+
+    it('should calculate EOW from Saturday correctly', () => {
+      // Saturday, Jan 20
+      const saturday = new Date('2024-01-20T12:00:00Z');
+      const result = DateParser.parseNaturalLanguageDate('eow', saturday);
+      expect(result).not.toBeNull();
+      expect(result!.toISOString().split('T')[0]).toBe('2024-01-26'); // Next Friday
+      expect(result!.getHours()).toBe(17);
+    });
+
+    it('should calculate EOW from Sunday correctly', () => {
+      // Sunday, Jan 21
+      const sunday = new Date('2024-01-21T12:00:00Z');
+      const result = DateParser.parseNaturalLanguageDate('eow', sunday);
+      expect(result).not.toBeNull();
+      expect(result!.toISOString().split('T')[0]).toBe('2024-01-26'); // Next Friday
+      expect(result!.getHours()).toBe(17);
+    });
+  });
 });
