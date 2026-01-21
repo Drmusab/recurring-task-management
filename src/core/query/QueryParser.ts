@@ -99,7 +99,15 @@ export class QueryParser {
   }
 
   private parseFilterInstruction(line: string): FilterNode | null {
-    // Check for boolean operators first (before simple keywords)
+    // Handle simple keywords first (before checking for boolean operators)
+    if (line === 'done') {
+      return { type: 'done', operator: 'is', value: true };
+    }
+    if (line === 'not done') {
+      return { type: 'done', operator: 'is', value: false };
+    }
+    
+    // Check for boolean operators (after simple keywords)
     if (line.includes(' AND ') || line.includes(' and ')) {
       return this.parseAndFilter(line);
     }
@@ -108,14 +116,6 @@ export class QueryParser {
     }
     if (line.startsWith('NOT ') || line.startsWith('not ')) {
       return this.parseNotFilter(line);
-    }
-
-    // Handle simple keywords
-    if (line === 'done') {
-      return { type: 'done', operator: 'is', value: true };
-    }
-    if (line === 'not done') {
-      return { type: 'done', operator: 'is', value: false };
     }
 
     // Status filters

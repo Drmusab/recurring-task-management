@@ -11,6 +11,7 @@ export class DescriptionFilter extends Filter {
   }
 
   matches(task: Task): boolean {
+    // Search in task name (main text)
     const searchText = task.name || '';
     
     switch (this.operator) {
