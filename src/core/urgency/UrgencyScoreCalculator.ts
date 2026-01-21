@@ -9,6 +9,15 @@ export interface UrgencyScoreOptions {
   settings?: UrgencySettings;
 }
 
+export interface UrgencyCalculation {
+  score: number;
+  breakdown: {
+    priorityContribution: number;
+    dueDateContribution: number;
+    overdueContribution: number;
+  };
+}
+
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
@@ -45,23 +54,56 @@ const getPriorityMultiplier = (
  *   - Settings-provided multipliers per priority level
  */
 export function calculateUrgencyScore(task: Task, options: UrgencyScoreOptions = {}): number {
+  const calculation = calculateUrgencyWithBreakdown(task, options);
+  return calculation.score;
+}
+
+/**
+ * Calculate task urgency score with detailed breakdown
+ */
+export function calculateUrgencyWithBreakdown(task: Task, options: UrgencyScoreOptions = {}): UrgencyCalculation {
   const now = options.now ?? new Date();
   const settings = options.settings ?? DEFAULT_URGENCY_SETTINGS;
 
   if (!isTaskActive(task)) {
-    return 0;
+    return {
+      score: 0,
+      breakdown: {
+        priorityContribution: 0,
+        dueDateContribution: 0,
+        overdueContribution: 0
+      }
+    };
   }
 
   const normalizedPriority = normalizePriority(task.priority) ?? "normal";
   const priorityMultiplier = getPriorityMultiplier(normalizedPriority, settings);
 
   if (!task.dueAt) {
-    return applyUrgencyCaps(settings.noDueDateScore * priorityMultiplier, settings);
+    const baseScore = settings.noDueDateScore;
+    const totalScore = baseScore * priorityMultiplier;
+    return {
+      score: applyUrgencyCaps(totalScore, settings),
+      breakdown: {
+        priorityContribution: totalScore - baseScore,  // Difference from base
+        dueDateContribution: baseScore,
+        overdueContribution: 0
+      }
+    };
   }
 
   const dueDate = new Date(task.dueAt);
   if (Number.isNaN(dueDate.getTime())) {
-    return applyUrgencyCaps(settings.noDueDateScore * priorityMultiplier, settings);
+    const baseScore = settings.noDueDateScore;
+    const totalScore = baseScore * priorityMultiplier;
+    return {
+      score: applyUrgencyCaps(totalScore, settings),
+      breakdown: {
+        priorityContribution: totalScore - baseScore,  // Difference from base
+        dueDateContribution: baseScore,
+        overdueContribution: 0
+      }
+    };
   }
 
   const isOverdue = dueDate.getTime() < now.getTime();
@@ -82,8 +124,17 @@ export function calculateUrgencyScore(task: Task, options: UrgencyScoreOptions =
     ? settings.overdueBaseScore + daysOverdue * settings.overduePenaltyWeight
     : 0;
 
-  const score = (baseDueScore + overduePenalty) * priorityMultiplier;
-  return applyUrgencyCaps(score, settings);
+  const baseScore = baseDueScore + overduePenalty;
+  const totalScore = baseScore * priorityMultiplier;
+  
+  return {
+    score: applyUrgencyCaps(totalScore, settings),
+    breakdown: {
+      priorityContribution: totalScore - baseScore,  // Difference from base
+      dueDateContribution: baseDueScore,
+      overdueContribution: overduePenalty
+    }
+  };
 }
 
 function applyUrgencyCaps(score: number, settings: UrgencySettings): number {
