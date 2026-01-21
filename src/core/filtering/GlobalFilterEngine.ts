@@ -104,7 +104,8 @@ export class GlobalFilterEngine {
 
       case 'path':
         if (!path) return false;
-        return path.includes(rule.pattern);
+        const normalizedPath = this.normalizePath(path);
+        return normalizedPath.includes(rule.pattern);
 
       case 'marker':
         // Custom marker like "TODO:", "TASK:"
