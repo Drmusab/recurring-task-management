@@ -15,6 +15,45 @@ A powerful recurring task management plugin for Shehab-Note (SiYuan fork) with a
 - **All Tasks View** - Comprehensive task management with enable/disable toggles
 - **Timeline View** - Visual calendar showing upcoming tasks for the next 30 days
 
+### 📅 Natural Language Date Parsing (NEW)
+Create tasks faster by typing dates naturally:
+
+- **Relative dates**: `tomorrow`, `in 3 days`, `next week`, `next month`
+- **Named days**: `Monday`, `next Friday`, `last Tuesday`  
+- **Specific dates**: `Jan 15`, `2024-01-15`, `March 3rd`
+- **Times**: `at 9am`, `2:30pm`, `14:00`
+- **Combined**: `tomorrow at 3pm`, `next Friday at 9am`
+- **Shortcuts**: `eod` (end of day), `eow` (end of week), `eom` (end of month)
+
+**Features:**
+- 🎯 **Smart autocomplete** - Intelligent suggestions as you type
+- ⌨️ **Keyboard shortcuts** - Quick date entry (Ctrl/Cmd+T for today, Ctrl/Cmd+M for tomorrow)
+- ✓ **Real-time validation** - Visual feedback shows parsed dates instantly
+- 🔄 **Fallback date picker** - Traditional date/time picker always available
+
+See [Natural Language Dates Documentation](docs/NATURAL_LANGUAGE_DATES.md) for complete reference.
+
+### 🤖 AI-Driven Features (NEW)
+- **Smart Suggestions** - AI-powered recommendations based on completion patterns
+  - Abandonment detection for never-completed tasks
+  - Reschedule suggestions based on when you actually complete tasks
+  - Urgency alerts for frequently missed tasks
+  - Frequency optimization for tasks you complete more often than scheduled
+  - Consolidation suggestions for similar tasks
+  - Delegation recommendations based on delay patterns
+- **Predictive Scheduling** - ML-based time slot scoring
+  - Analyzes historical success rates
+  - Considers workload balance and task density
+  - Respects user preferences and energy levels
+  - Minimizes context switching
+- **Keyboard Navigation** - Vim-like shortcuts for power users
+  - Full keyboard control (j/k navigation, dd delete, yy duplicate)
+  - Multiple modes: Normal, Insert, Visual, Command
+  - Command palette for advanced operations
+  - Customizable keybindings
+
+See [AI Features Documentation](docs/AI_FEATURES.md) for detailed information.
+
 ### 🔔 Multi-Channel Notifications
 - **n8n** - Webhook integration for workflow automation
 - **Telegram** - Direct messaging via Telegram Bot API
