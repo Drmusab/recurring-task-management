@@ -25,6 +25,15 @@ import {
 } from "@/core/api/SiYuanApiAdapter";
 
 /**
+ * Retry queue entry for failed block attribute syncs
+ */
+interface SyncRetryEntry {
+  task: Task;
+  attempts: number;
+  nextRetry: number;
+}
+
+/**
  * TaskStorage manages task persistence using SiYuan storage API.
  * Active tasks are loaded on startup, while archived tasks are stored in
  * chunked files and loaded on demand to keep startup fast.
@@ -54,7 +63,7 @@ export class TaskStorage implements TaskStorageProvider {
   private apiAdapter: SiYuanApiAdapter;
   
   // Retry queue for failed block attribute syncs
-  private syncRetryQueue: Map<string, { task: Task; attempts: number; nextRetry: number }> = new Map();
+  private syncRetryQueue: Map<string, SyncRetryEntry> = new Map();
   private retryProcessorInterval?: NodeJS.Timeout;
 
   constructor(plugin: Plugin, apiAdapter: SiYuanApiAdapter = new SiYuanApiAdapter()) {
