@@ -81,13 +81,21 @@ description regex urgent|asap # Matches regex pattern (case-insensitive)
 
 The description filter searches both the task name and description fields.
 
-### 7. Recurrence Filters
+### 7. Heading Filters
+```
+heading includes Work         # Document heading contains "Work"
+heading does not include Personal # Heading does not contain "Personal"
+```
+
+The heading filter searches the document heading/section where the task is located. This is useful for filtering tasks based on their location within a document's structure.
+
+### 8. Recurrence Filters
 ```
 is recurring                  # Recurring tasks
 is not recurring              # Non-recurring tasks
 ```
 
-### 8. Dependency Filters
+### 9. Dependency Filters
 ```
 is blocked                    # Blocked by other tasks
 is not blocked                # Not blocked
@@ -119,6 +127,7 @@ sort by due                   # Sort by due date
 sort by priority              # Sort by priority
 sort by priority reverse      # Reverse sort
 sort by created               # Sort by creation date
+sort by heading               # Sort by document heading
 sort by path                  # Sort by file path
 sort by description           # Sort by description
 ```
@@ -173,6 +182,9 @@ due today
 
 # Show recurring tasks
 is recurring
+
+# Show tasks in Work section
+heading includes Work
 ```
 
 ### Advanced Filtering
@@ -188,6 +200,12 @@ not done AND has due date
 
 # Tasks with "meeting" in description
 description includes meeting
+
+# Tasks in Work Projects section
+heading includes "Work Projects"
+
+# Tasks NOT in Personal section
+heading does not include Personal
 
 # High priority or urgent tasks that are not done
 (priority high OR priority urgent) AND not done
@@ -227,6 +245,12 @@ group by tags
 is blocked
 not done
 sort by priority reverse
+
+# Work tasks grouped by heading
+heading includes Work
+not done
+group by heading
+sort by priority
 ```
 
 ## Tips and Best practices

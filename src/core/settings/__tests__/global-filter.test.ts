@@ -58,7 +58,7 @@ describe('GlobalFilterEngine', () => {
       expect(engine.evaluate('- [ ] Task without priority', 'any.md')).toBe(false);
     });
 
-    it('should include items matching any rule (OR logic)', () => {
+    it('should include items matching all rules (AND logic)', () => {
       config.mode = 'include';
       config.rules = [
         createFilterRule('tag', '#task'),
@@ -66,8 +66,10 @@ describe('GlobalFilterEngine', () => {
       ];
       engine.updateConfig(config);
 
-      expect(engine.evaluate('- [ ] Do work #task', 'personal/todo.md')).toBe(true);
-      expect(engine.evaluate('- [ ] Do work', 'work/project.md')).toBe(true);
+      // Must match both tag AND path
+      expect(engine.evaluate('- [ ] Do work #task', 'work/project.md')).toBe(true);
+      expect(engine.evaluate('- [ ] Do work #task', 'personal/todo.md')).toBe(false);
+      expect(engine.evaluate('- [ ] Do work', 'work/project.md')).toBe(false);
       expect(engine.evaluate('- [ ] Do work', 'personal/todo.md')).toBe(false);
     });
 
