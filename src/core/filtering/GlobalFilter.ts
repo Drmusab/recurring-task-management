@@ -1,70 +1,330 @@
-import { GlobalFilterEngine } from './GlobalFilterEngine';
-import type { GlobalFilterConfig } from './FilterRule';
-import { DEFAULT_GLOBAL_FILTER_CONFIG } from './FilterRule';
+import { Minimatch } from 'minimatch';
 import type { Task } from '@/core/models/Task';
+import type { 
+  GlobalFilterProfile, 
+  FilterDecision, 
+  RegexTarget, 
+  GlobalFilterConfig 
+} from './FilterRule';
+import { DEFAULT_GLOBAL_FILTER_CONFIG } from './FilterRule';
 
 /**
- * Main entry point for global filtering
- * Singleton pattern for application-wide filter state
+ * Precompiled filter for maximum performance
+ * ONE instance per active profile
+ */
+export class CompiledGlobalFilter {
+  private includePathMatchers: Minimatch[] = [];
+  private excludePathMatchers: Minimatch[] = [];
+  private includeTagsSet: Set<string> = new Set();
+  private excludeTagsSet: Set<string> = new Set();
+  private includeRegex?: RegExp;
+  private excludeRegex?: RegExp;
+  private regexTargets: Set<RegexTarget>;
+  
+  constructor(profile: GlobalFilterProfile) {
+    // Compile glob patterns
+    this.includePathMatchers = profile.includePaths.map(p => 
+      new Minimatch(this.normalizePath(p), { dot: true, matchBase: true })
+    );
+    this.excludePathMatchers = profile.excludePaths.map(p => 
+      new Minimatch(this.normalizePath(p), { dot: true, matchBase: true })
+    );
+    
+    // Compile tag sets (boundary-safe)
+    this.includeTagsSet = new Set(profile.includeTags.map(t => this.normalizeTag(t)));
+    this.excludeTagsSet = new Set(profile.excludeTags. map(t => this.normalizeTag(t)));
+    
+    // Compile regex (safe - invalid regex = disabled)
+    if (profile.includeRegex) {
+      try { 
+        this.includeRegex = new RegExp(profile. includeRegex); 
+      } catch { 
+        /* invalid = disabled */ 
+      }
+    }
+    if (profile.excludeRegex) {
+      try { 
+        this.excludeRegex = new RegExp(profile.excludeRegex); 
+      } catch { 
+        /* invalid = disabled */ 
+      }
+    }
+    
+    this.regexTargets = new Set(profile.regexTargets);
+  }
+  
+  /**
+   * Fast boolean check
+   */
+  matches(task: Task): boolean {
+    return this.explain(task).included;
+  }
+  
+  /**
+   * Explain decision (for debugging)
+   * 
+   * Evaluation order (fastest first):
+   * 1. Exclude paths
+   * 2. Include paths (if non-empty)
+   * 3.  Exclude tags
+   * 4. Include tags (if non-empty)
+   * 5. Exclude regex
+   * 6. Include regex
+   * 
+   * Exclude always wins. 
+   */
+  explain(task: Task): FilterDecision {
+    const ctx = this.buildContext(task);
+    
+    // 1. Exclude paths (fastest first, wins)
+    if (this.excludePathMatchers.length > 0 && ctx.path) {
+      for (const matcher of this.excludePathMatchers) {
+        if (matcher.match(ctx.path)) {
+          return {
+            included: false,
+            reason: 'Excluded by path pattern',
+            matchedRule: { type: 'excludePath', pattern: matcher.pattern },
+          };
+        }
+      }
+    }
+    
+    // 2. Include paths (if non-empty, must match one)
+    if (this.includePathMatchers.length > 0) {
+      if (! ctx.path) {
+        return {
+          included: false,
+          reason: 'includePaths set but task has no path metadata',
+        };
+      }
+      let matched = false;
+      for (const matcher of this.includePathMatchers) {
+        if (matcher.match(ctx.path)) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        return {
+          included: false,
+          reason: 'Did not match any includePath pattern',
+        };
+      }
+    }
+    
+    // 3. Exclude tags (wins)
+    if (this.excludeTagsSet.size > 0 && ctx.tags. length > 0) {
+      for (const tag of ctx.tags) {
+        if (this.excludeTagsSet.has(tag)) {
+          return {
+            included: false,
+            reason:  'Excluded by tag',
+            matchedRule: { type: 'excludeTag', pattern: tag },
+          };
+        }
+      }
+    }
+    
+    // 4. Include tags (if non-empty, must have at least one)
+    if (this.includeTagsSet. size > 0) {
+      if (ctx.tags.length === 0) {
+        return {
+          included: false,
+          reason:  'includeTags set but task has no tags',
+        };
+      }
+      let matched = false;
+      for (const tag of ctx.tags) {
+        if (this.includeTagsSet.has(tag)) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        return {
+          included: false,
+          reason: 'Did not match any includeTag',
+        };
+      }
+    }
+    
+    // 5. Exclude regex (wins)
+    if (this.excludeRegex) {
+      const targets = this.extractRegexTargets(task, ctx);
+      for (const [targetType, targetValue] of targets) {
+        if (this.excludeRegex. test(targetValue)) {
+          return {
+            included: false,
+            reason: 'Excluded by regex',
+            matchedRule: { 
+              type: 'excludeRegex', 
+              pattern:  this.excludeRegex.source, 
+              target: targetType 
+            },
+          };
+        }
+      }
+    }
+    
+    // 6. Include regex (must match)
+    if (this.includeRegex) {
+      const targets = this.extractRegexTargets(task, ctx);
+      let matched = false;
+      for (const [, targetValue] of targets) {
+        if (this.includeRegex.test(targetValue)) {
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        return {
+          included: false,
+          reason: 'Did not match includeRegex',
+          matchedRule: { type: 'includeRegex', pattern: this.includeRegex.source },
+        };
+      }
+    }
+    
+    // Passed all filters
+    return { included: true, reason: 'Passed all filters' };
+  }
+  
+  private buildContext(task: Task) {
+    return {
+      path: task.path ?  this.normalizePath(task. path) : undefined,
+      fileName: task.path ? this.extractFileName(task.path) : undefined,
+      tags: (task.tags || []).map(t => this.normalizeTag(t)),
+      taskText: task.name || '',
+    };
+  }
+  
+  private extractRegexTargets(
+    task: Task, 
+    ctx: ReturnType<typeof this.buildContext>
+  ): Array<[string, string]> {
+    const targets: Array<[string, string]> = [];
+    if (this.regexTargets. has('taskText')) targets.push(['taskText', ctx.taskText]);
+    if (this.regexTargets.has('path') && ctx.path) targets.push(['path', ctx.path]);
+    if (this.regexTargets.has('fileName') && ctx.fileName) targets.push(['fileName', ctx.fileName]);
+    return targets;
+  }
+  
+  private normalizePath(path: string): string {
+    return path.replace(/\\/g, '/').replace(/^\/+/, '');
+  }
+  
+  private normalizeTag(tag: string): string {
+    return tag.startsWith('#') ? tag.toLowerCase() : `#${tag}`.toLowerCase();
+  }
+  
+  private extractFileName(path:  string): string {
+    return path.split('/').pop() || '';
+  }
+}
+
+/**
+ * Singleton Global Filter (UPDATED with profiles support)
  */
 export class GlobalFilter {
-  private static instance: GlobalFilter | null = null;
-  private engine: GlobalFilterEngine;
-
+  private static instance: GlobalFilter;
+  private config: GlobalFilterConfig;
+  private compiled: CompiledGlobalFilter | null = null;
+  
   private constructor() {
-    this.engine = new GlobalFilterEngine(DEFAULT_GLOBAL_FILTER_CONFIG);
+    this.config = DEFAULT_GLOBAL_FILTER_CONFIG;
   }
-
-  /**
-   * Get singleton instance
-   */
+  
   static getInstance(): GlobalFilter {
-    if (!GlobalFilter.instance) {
+    if (! GlobalFilter.instance) {
       GlobalFilter.instance = new GlobalFilter();
     }
     return GlobalFilter.instance;
   }
-
-  /**
-   * Initialize with configuration
-   */
+  
   initialize(config: GlobalFilterConfig): void {
-    this.engine.updateConfig(config);
+    this.updateConfig(config);
   }
-
+  
+  updateConfig(config: GlobalFilterConfig): void {
+    this.config = config;
+    this.compile();
+  }
+  
+  private compile(): void {
+    if (!this.config.enabled) {
+      this.compiled = null;
+      return;
+    }
+    
+    const activeProfile = this.config.profiles.find(p => p.id === this.config.activeProfileId) 
+      || this.config.profiles[0];
+    
+    if (!activeProfile) {
+      this.compiled = null;
+      return;
+    }
+    
+    this.compiled = new CompiledGlobalFilter(activeProfile);
+  }
+  
   /**
-   * Check if a checkbox line should be treated as a task
-   * Call BEFORE parsing
+   * Call BEFORE parsing (raw block content)
    */
-  shouldTreatAsTask(blockContent: string, blockPath?: string): boolean {
-    return this.engine.evaluate(blockContent, blockPath);
+  shouldTreatAsTask(blockContent: string, blockPath?:  string): boolean {
+    if (! this.compiled) return true;
+    
+    // Extract tags from raw content for early filtering
+    const tags = this. extractTagsFromContent(blockContent);
+    const mockTask:  Partial<Task> = {
+      name: blockContent,
+      path: blockPath,
+      tags,
+    };
+    
+    return this.compiled.matches(mockTask as Task);
   }
-
+  
   /**
-   * Check if a parsed task should be included (for previews)
+   * Call AFTER parsing (full task object)
    */
   shouldIncludeTask(task: Task): boolean {
-    return this.engine.evaluateTask(task);
+    if (!this. compiled) return true;
+    return this.compiled.matches(task);
   }
-
+  
   /**
-   * Get current configuration
+   * Explain why task was excluded (for debugging)
    */
+  explainTask(task: Task): FilterDecision {
+    if (!this.compiled) {
+      return { included: true, reason: 'Global filter disabled' };
+    }
+    return this.compiled.explain(task);
+  }
+  
+  private extractTagsFromContent(content:  string): string[] {
+    return (content. match(/#[\w\/-]+/g) || []);
+  }
+  
   getConfig(): GlobalFilterConfig {
-    return this.engine.getConfig();
+    return this.config;
   }
-
-  /**
-   * Update configuration
-   */
-  updateConfig(config: GlobalFilterConfig): void {
-    this.engine.updateConfig(config);
+  
+  getActiveProfile(): GlobalFilterProfile | undefined {
+    return this.config.profiles.find(p => p.id === this.config.activeProfileId);
   }
-
+  
+  setActiveProfile(profileId: string): void {
+    if (this.config.profiles.some(p => p.id === profileId)) {
+      this.config.activeProfileId = profileId;
+      this.compile();
+    }
+  }
+  
   /**
-   * Reset to default configuration (for testing)
+   * Reset to default (for testing)
    */
   reset(): void {
-    this.engine.updateConfig(DEFAULT_GLOBAL_FILTER_CONFIG);
+    this.updateConfig(DEFAULT_GLOBAL_FILTER_CONFIG);
   }
 }
