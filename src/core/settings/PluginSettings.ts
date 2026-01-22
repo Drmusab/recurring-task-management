@@ -1,6 +1,7 @@
 /**
  * Plugin settings for Phase 2+ features
  */
+import type { GlobalFilterProfile } from '@/core/filtering/FilterRule';
 
 import type { FilenameDateConfig } from './FilenameDate';
 import type { GlobalFilterConfig, GlobalFilterProfile } from '@/core/filtering/FilterRule';
