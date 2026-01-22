@@ -23,6 +23,7 @@ import {
   type SiYuanBlockAPI,
   reportSiYuanApiIssue,
 } from "@/core/api/SiYuanApiAdapter";
+import { GlobalFilter } from '@/core/filtering/GlobalFilter'; // Add this import
 
 /**
  * Retry queue entry for failed block attribute syncs
@@ -81,8 +82,19 @@ export class TaskStorage implements TaskStorageProvider {
    */
   async init(): Promise<void> {
     await this.migrateLegacyStorage();
-    this.activeTasks = await this.activeStore.loadActive();
-    logger.info(`Loaded ${this.activeTasks.size} active tasks from storage`);
+    const loadedTasks = await this.activeStore.loadActive();
+    
+    // Apply global filter
+    const globalFilter = GlobalFilter.getInstance();
+    const filtered = new Map<string, Task>();
+    for (const [id, task] of loadedTasks.entries()) {
+      if (globalFilter.shouldIncludeTask(task)) {
+        filtered.set(id, task);
+      }
+    }
+    
+    this.activeTasks = filtered;
+    logger.info(`Loaded ${this.activeTasks.size} active tasks from storage (after global filter)`);
     this.rebuildBlockIndex();
     this.rebuildDueIndex();
     this.startSyncRetryProcessor();
@@ -97,7 +109,12 @@ export class TaskStorage implements TaskStorageProvider {
   ): Promise<Task[]> {
     const taskMap = await this.activeStore.loadActive();
     const allTasks = Array.from(taskMap.values());
-    const total = allTasks.length;
+    
+    // Apply global filter BEFORE indexing
+    const globalFilter = GlobalFilter.getInstance();
+    const filteredTasks = allTasks.filter(task => globalFilter.shouldIncludeTask(task));
+    
+    const total = filteredTasks.length;
     
     if (total === 0) {
       return [];
@@ -106,7 +123,7 @@ export class TaskStorage implements TaskStorageProvider {
     const result: Task[] = [];
 
     for (let i = 0; i < total; i += batchSize) {
-      const batch = allTasks.slice(i, Math.min(i + batchSize, total));
+      const batch = filteredTasks.slice(i, Math.min(i + batchSize, total));
       result.push(...batch);
 
       if (progressCallback) {
