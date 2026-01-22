@@ -3,7 +3,7 @@
  */
 
 import type { FilenameDateConfig } from './FilenameDate';
-import type { GlobalFilterConfig } from '@/core/filtering/FilterRule';
+import type { GlobalFilterConfig, GlobalFilterProfile } from '@/core/filtering/FilterRule';
 import type { GlobalQueryConfig } from '@/core/query/GlobalQuery';
 import { DEFAULT_GLOBAL_FILTER_CONFIG } from '@/core/filtering/FilterRule';
 import { DEFAULT_GLOBAL_QUERY_CONFIG } from '@/core/query/GlobalQuery';
@@ -228,6 +228,36 @@ export const DEFAULT_SETTINGS: PluginSettings = {
  * Merge user settings with defaults
  */
 export function mergeSettings(userSettings: Partial<PluginSettings>): PluginSettings {
+  // ========== NEW: Migrate old globalFilter format to profiles ==========
+  if (userSettings.globalFilter && !(userSettings.globalFilter as any).profiles) {
+    const legacyConfig = userSettings.globalFilter as any;
+
+    const migratedProfile: GlobalFilterProfile = {
+      id: 'migrated-default',
+      name: 'Migrated Settings',
+      description: 'Automatically migrated from previous version',
+      includePaths: [],
+      excludePaths: [
+        ...(legacyConfig.excludeFolders || []),
+        ...(legacyConfig.excludeFilePatterns || []),
+      ],
+      includeTags: [],
+      excludeTags: legacyConfig.excludeTags || [],
+      includeRegex: undefined,
+      excludeRegex: undefined,
+      regexTargets: ['taskText'],
+      excludeStatusTypes: legacyConfig.excludeStatusTypes || [],
+    };
+
+    userSettings.globalFilter = {
+      enabled: legacyConfig.enabled ?? false,
+      mode: legacyConfig.mode ?? 'all',
+      activeProfileId: 'migrated-default',
+      profiles: [migratedProfile],
+    };
+  }
+  // ========== END MIGRATION ==========
+
   return {
     dates: {
       ...DEFAULT_SETTINGS.dates,
@@ -248,11 +278,7 @@ export function mergeSettings(userSettings: Partial<PluginSettings>): PluginSett
     globalFilter: {
       ...DEFAULT_SETTINGS.globalFilter,
       ...userSettings.globalFilter,
-      excludeFolders: userSettings.globalFilter?.excludeFolders ?? DEFAULT_SETTINGS.globalFilter.excludeFolders,
-      excludeNotebooks: userSettings.globalFilter?.excludeNotebooks ?? DEFAULT_SETTINGS.globalFilter.excludeNotebooks,
-      excludeTags: userSettings.globalFilter?.excludeTags ?? DEFAULT_SETTINGS.globalFilter.excludeTags,
-      excludeFilePatterns: userSettings.globalFilter?.excludeFilePatterns ?? DEFAULT_SETTINGS.globalFilter.excludeFilePatterns,
-      excludeStatusTypes: userSettings.globalFilter?.excludeStatusTypes ?? DEFAULT_SETTINGS.globalFilter.excludeStatusTypes,
+      profiles: userSettings.globalFilter?.profiles ?? DEFAULT_SETTINGS.globalFilter.profiles,
     },
     globalQuery: {
       ...DEFAULT_SETTINGS.globalQuery,
