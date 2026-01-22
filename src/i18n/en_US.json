@@ -85,3 +85,19 @@
     "loadFailed": "Failed to load tasks"
   }
 }
+{
+  "switchGlobalFilterProfile": "Switch Global Filter Profile",
+  "toggleGlobalFilter": "Toggle Global Filter",
+  "showGlobalFilterStatus": "Show Global Filter Status",
+  "createGlobalFilterProfile": "Create Global Filter Profile",
+  "explainTaskExclusion": "Explain Why Task Is Excluded",
+  "manageProfiles": "Manage Profiles...",
+  "globalFilterEnabled": "Global Filter enabled",
+  "globalFilterDisabled": "Global Filter is disabled",
+  "noProfiles": "No profiles found",
+  "noActiveProfile": "No active profile",
+  "enterProfileName": "Enter profile name:",
+  "configureNewProfile": "Configure new profile now?",
+  "profileNotFound": "Profile not found",
+  "noTaskSelected": "No task selected.  Click on a task first."
+}
