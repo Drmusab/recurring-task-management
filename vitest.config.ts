@@ -12,7 +12,8 @@ export default mergeConfig(
       include: [
         'src/__tests__/**/*.test.ts',
         'src/parser/**/*.test.ts',
-        'src/utils/**/*.test.ts'
+        'src/utils/**/*.test.ts',
+        'src/features/**/*.test.ts',
       ],
     },
     resolve: {

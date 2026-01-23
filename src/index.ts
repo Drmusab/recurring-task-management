@@ -25,6 +25,7 @@ import type { ShortcutManager } from "./commands/ShortcutManager";
 import { InlineQueryController } from "./core/inline-query/InlineQueryController";
 import { handleCreateTaskFromBlock } from "./commands/CreateTaskFromBlock";
 import { SiYuanApiAdapter } from "./core/api/SiYuanApiAdapter";
+import { AutoTaskCreator } from "./features/AutoTaskCreator";
 import "./index.scss";
 
 export default class RecurringTasksPlugin extends Plugin {
@@ -46,6 +47,7 @@ export default class RecurringTasksPlugin extends Plugin {
   private pendingCompletionTimeouts: Map<string, number> = new Map();
   private shortcutManager: ShortcutManager | null = null;
   private inlineQueryController: InlineQueryController | null = null;
+  private autoTaskCreator: AutoTaskCreator | null = null;
 
   async onload() {
     logger.info("Loading Recurring Tasks Plugin");
@@ -431,6 +433,16 @@ export default class RecurringTasksPlugin extends Plugin {
     });
     this.inlineQueryController.mount();
 
+    // Initialize Auto Task Creator (Phase 3)
+    this.autoTaskCreator = new AutoTaskCreator({
+      repository: this.repository,
+      settings: () => this.settingsService.get().inlineTasks,
+      saveTask: async (task) => {
+        await this.repository.createTask(task);
+      },
+    });
+    this.setupAutoCreationEventHandlers();
+
     logger.info("Recurring Tasks Plugin loaded successfully");
   }
 
@@ -449,6 +461,11 @@ export default class RecurringTasksPlugin extends Plugin {
     // Destroy topbar menu
     if (this.topbarMenu) {
       this.topbarMenu.destroy();
+    }
+    
+    // Cleanup auto task creator
+    if (this.autoTaskCreator) {
+      this.autoTaskCreator.cleanup();
     }
     
     // Destroy dashboard
@@ -534,6 +551,71 @@ export default class RecurringTasksPlugin extends Plugin {
     window.removeEventListener("recurring-task-settings", this.handleSettingsEvent);
     window.removeEventListener("recurring-task-complete", this.handleCompleteTaskEvent);
     window.removeEventListener("task-snooze", this.handleSnoozeTaskEvent);
+    
+    // Remove auto-creation handlers
+    if (this.autoCreationKeydownHandler) {
+      document.removeEventListener("keydown", this.autoCreationKeydownHandler);
+    }
+    if (this.autoCreationBlurHandler) {
+      document.removeEventListener("focusout", this.autoCreationBlurHandler, true);
+    }
+  }
+
+  private autoCreationKeydownHandler: ((event: KeyboardEvent) => void) | null = null;
+  private autoCreationBlurHandler: ((event: FocusEvent) => void) | null = null;
+
+  // Shared regex pattern for checklist detection
+  private static readonly CHECKLIST_PATTERN = /^-\s*\[\s*[x\s\-]\s*\]/i;
+
+  /**
+   * Setup event handlers for auto-creation (Phase 3)
+   */
+  private setupAutoCreationEventHandlers() {
+    if (!this.autoTaskCreator) return;
+
+    // Handler for Enter key
+    this.autoCreationKeydownHandler = (event: KeyboardEvent) => {
+      if (event.key !== "Enter") return;
+      
+      const target = event.target as HTMLElement;
+      const blockElement = target.closest("[data-node-id]") as HTMLElement | null;
+      
+      if (!blockElement) return;
+      
+      const blockId = blockElement.getAttribute("data-node-id");
+      const content = blockElement.textContent || "";
+      
+      if (!blockId || !RecurringTasksPlugin.CHECKLIST_PATTERN.test(content.trim())) {
+        return;
+      }
+      
+      // Trigger auto-creation on Enter
+      this.autoTaskCreator.handleEnter(blockId, content.trim());
+    };
+
+    // Handler for blur/focusout
+    this.autoCreationBlurHandler = (event: FocusEvent) => {
+      const target = event.target as HTMLElement;
+      const blockElement = target.closest("[data-node-id]") as HTMLElement | null;
+      
+      if (!blockElement) return;
+      
+      const blockId = blockElement.getAttribute("data-node-id");
+      const content = blockElement.textContent || "";
+      
+      if (!blockId || !RecurringTasksPlugin.CHECKLIST_PATTERN.test(content.trim())) {
+        return;
+      }
+      
+      // Trigger auto-creation on blur
+      this.autoTaskCreator.handleBlur(blockId, content.trim());
+    };
+
+    // Add event listeners
+    document.addEventListener("keydown", this.autoCreationKeydownHandler);
+    document.addEventListener("focusout", this.autoCreationBlurHandler, true);
+    
+    logger.info("Auto-creation event handlers registered");
   }
 
   private handleCreateTaskEvent = (event: Event) => {
