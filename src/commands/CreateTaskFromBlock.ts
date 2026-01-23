@@ -157,8 +157,14 @@ function updateTaskFromParsed(task: Task, parsed: ParsedTask): void {
     task.dependsOn = parsed.dependsOn;
   }
   
-  // Note: Recurrence parsing would need more complex handling
-  // This is a simplified version for Phase 2
+  // TODO: Full recurrence parsing implementation
+  // Currently this is a simplified version for Phase 2.
+  // Full implementation requires:
+  // - Parsing RRULE strings from inline format
+  // - Converting to Frequency object
+  // - Handling 'when done' mode vs 'scheduled' mode
+  // - Validating recurrence rules
+  // This will be completed in Phase 3 when auto-creation features are added.
   if (parsed.recurrence) {
     task.recurrenceText = parsed.recurrence.rule;
   }

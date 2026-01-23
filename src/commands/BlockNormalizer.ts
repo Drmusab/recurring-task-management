@@ -31,6 +31,8 @@ export async function saveAndNormalizeBlock(
     dueDate: savedTask.dueAt ? savedTask.dueAt.substring(0, 10) : undefined,
     scheduledDate: savedTask.scheduledAt ? savedTask.scheduledAt.substring(0, 10) : undefined,
     startDate: savedTask.startAt ? savedTask.startAt.substring(0, 10) : undefined,
+    // Map Task priority ('high'|'normal'|'low') to ParsedTask priority ('high'|'medium'|'low')
+    // 'normal' maps to 'medium' to match the inline parser's emoji system (🔼)
     priority: savedTask.priority === 'high' ? 'high' : 
               savedTask.priority === 'low' ? 'low' :
               savedTask.priority === 'normal' ? 'medium' : undefined,
@@ -61,7 +63,18 @@ export async function saveAndNormalizeBlock(
 
 /**
  * Update block content using SiYuan API
- * Note: SiYuan's updateBlock API works with markdown content
+ * 
+ * Note: This is a Phase 2 implementation that uses custom attributes.
+ * Full block markdown content update requires SiYuan's SQL API or kernel API,
+ * which will be implemented in a future phase when we have more context
+ * about the best approach for different SiYuan versions.
+ * 
+ * Current approach:
+ * - Sets custom attributes to track normalization state
+ * - Stores normalized content in an attribute for debugging
+ * - Does NOT modify the actual block markdown yet
+ * 
+ * TODO: Implement full block content update in Phase 3 using appropriate SiYuan API
  */
 async function updateBlockContent(
   blockId: string,
