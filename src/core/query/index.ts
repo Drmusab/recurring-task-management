@@ -25,6 +25,12 @@ export { IsBlockedFilter, IsBlockingFilter, type DependencyGraph } from './filte
 export { RecurrenceFilter } from './filters/RecurrenceFilter';
 export { AndFilter, OrFilter, NotFilter } from './filters/BooleanFilter';
 export { DescriptionFilter } from './filters/DescriptionFilter';
+export { DescriptionRegexFilter } from './filters/DescriptionRegexFilter';
+export { PathRegexFilter } from './filters/PathRegexFilter';
+export { TagRegexFilter } from './filters/TagRegexFilter';
+
+// Utils
+export { RegexMatcher, type RegexSpec } from './utils/RegexMatcher';
 
 // Groupers
 export { Grouper } from './groupers/GrouperBase';

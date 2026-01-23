@@ -24,6 +24,9 @@ import { AndFilter, OrFilter, NotFilter } from './filters/BooleanFilter';
 import { DescriptionFilter } from './filters/DescriptionFilter';
 import { HeadingFilter } from './filters/HeadingFilter';
 import { UrgencyFilter, type UrgencyComparator } from './filters/UrgencyFilter';
+import { DescriptionRegexFilter } from './filters/DescriptionRegexFilter';
+import { PathRegexFilter } from './filters/PathRegexFilter';
+import { TagRegexFilter } from './filters/TagRegexFilter';
 import { Grouper } from './groupers/GrouperBase';
 import { DueDateGrouper, ScheduledDateGrouper } from './groupers/DateGrouper';
 import { StatusTypeGrouper, StatusNameGrouper } from './groupers/StatusGrouper';
@@ -264,6 +267,15 @@ export class QueryEngine {
           node.value,
           node.negate
         );
+
+      case 'description-regex':
+        return new DescriptionRegexFilter(node.value, node.negate);
+
+      case 'path-regex':
+        return new PathRegexFilter(node.value, node.negate);
+
+      case 'tag-regex':
+        return new TagRegexFilter(node.value, node.negate);
 
       case 'heading':
         return new HeadingFilter(

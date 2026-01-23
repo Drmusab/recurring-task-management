@@ -3,6 +3,7 @@ import { StatusType } from '@/core/models/Status';
 import type { DateField, DateComparator } from './filters/DateFilter';
 import type { PriorityLevel } from './filters/PriorityFilter';
 import { DateParser } from '@/core/parsers/DateParser';
+import { RegexMatcher, type RegexSpec } from './utils/RegexMatcher';
 
 /**
  * Parse query string to Abstract Syntax Tree (AST)
@@ -20,7 +21,7 @@ export interface QueryAST {
 }
 
 export interface FilterNode {
-  type: 'status' | 'date' | 'priority' | 'urgency' | 'tag' | 'path' | 'dependency' | 'recurrence' | 'boolean' | 'done' | 'description' | 'heading';
+  type: 'status' | 'date' | 'priority' | 'urgency' | 'tag' | 'path' | 'dependency' | 'recurrence' | 'boolean' | 'done' | 'description' | 'heading' | 'description-regex' | 'path-regex' | 'tag-regex';
   operator: string;
   value: any;
   negate?: boolean;
@@ -257,6 +258,22 @@ export class QueryParser {
       return { type: 'tag', operator: 'has', value: false };
     }
 
+    // Tag regex filters
+    if (line.startsWith('tag regex ') || line.startsWith('tags regex ')) {
+      const patternStr = line.startsWith('tag regex ') 
+        ? line.substring('tag regex '.length).trim()
+        : line.substring('tags regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'tag-regex', operator: 'regex', value: regexSpec };
+    }
+    if (line.startsWith('not tag regex ') || line.startsWith('not tags regex ')) {
+      const patternStr = line.startsWith('not tag regex ')
+        ? line.substring('not tag regex '.length).trim()
+        : line.substring('not tags regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'tag-regex', operator: 'regex', value: regexSpec, negate: true };
+    }
+
     // Path filters
     if (line.startsWith('path includes ')) {
       const pattern = line.substring('path includes '.length).trim();
@@ -265,6 +282,18 @@ export class QueryParser {
     if (line.startsWith('path does not include ')) {
       const pattern = line.substring('path does not include '.length).trim();
       return { type: 'path', operator: 'includes', value: this.unquote(pattern), negate: true };
+    }
+
+    // Path regex filters
+    if (line.startsWith('path regex ')) {
+      const patternStr = line.substring('path regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'path-regex', operator: 'regex', value: regexSpec };
+    }
+    if (line.startsWith('not path regex ')) {
+      const patternStr = line.substring('not path regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'path-regex', operator: 'regex', value: regexSpec, negate: true };
     }
 
     // Dependency filters
@@ -295,9 +324,16 @@ export class QueryParser {
       const pattern = line.substring('description does not include '.length).trim();
       return { type: 'description', operator: 'does not include', value: this.unquote(pattern) };
     }
+    // Description regex filter (new format with regex literals)
     if (line.startsWith('description regex ')) {
-      const pattern = line.substring('description regex '.length).trim();
-      return { type: 'description', operator: 'regex', value: this.unquote(pattern) };
+      const patternStr = line.substring('description regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'description-regex', operator: 'regex', value: regexSpec };
+    }
+    if (line.startsWith('not description regex ')) {
+      const patternStr = line.substring('not description regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'description-regex', operator: 'regex', value: regexSpec, negate: true };
     }
 
     // Heading filters
@@ -793,6 +829,22 @@ export class QueryParser {
       return { type: 'tag', operator: 'has', value: false };
     }
 
+    // Tag regex filters
+    if (trimmed.startsWith('tag regex ') || trimmed.startsWith('tags regex ')) {
+      const patternStr = trimmed.startsWith('tag regex ') 
+        ? trimmed.substring('tag regex '.length).trim()
+        : trimmed.substring('tags regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'tag-regex', operator: 'regex', value: regexSpec };
+    }
+    if (trimmed.startsWith('not tag regex ') || trimmed.startsWith('not tags regex ')) {
+      const patternStr = trimmed.startsWith('not tag regex ')
+        ? trimmed.substring('not tag regex '.length).trim()
+        : trimmed.substring('not tags regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'tag-regex', operator: 'regex', value: regexSpec, negate: true };
+    }
+
     // Path filters
     if (trimmed.startsWith('path includes ')) {
       const pattern = trimmed.substring('path includes '.length).trim();
@@ -801,6 +853,18 @@ export class QueryParser {
     if (trimmed.startsWith('path does not include ')) {
       const pattern = trimmed.substring('path does not include '.length).trim();
       return { type: 'path', operator: 'includes', value: this.unquote(pattern), negate: true };
+    }
+
+    // Path regex filters
+    if (trimmed.startsWith('path regex ')) {
+      const patternStr = trimmed.substring('path regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'path-regex', operator: 'regex', value: regexSpec };
+    }
+    if (trimmed.startsWith('not path regex ')) {
+      const patternStr = trimmed.substring('not path regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'path-regex', operator: 'regex', value: regexSpec, negate: true };
     }
 
     // Dependency filters
@@ -831,9 +895,16 @@ export class QueryParser {
       const pattern = trimmed.substring('description does not include '.length).trim();
       return { type: 'description', operator: 'does not include', value: this.unquote(pattern) };
     }
+    // Description regex filter (new format with regex literals)
     if (trimmed.startsWith('description regex ')) {
-      const pattern = trimmed.substring('description regex '.length).trim();
-      return { type: 'description', operator: 'regex', value: this.unquote(pattern) };
+      const patternStr = trimmed.substring('description regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'description-regex', operator: 'regex', value: regexSpec };
+    }
+    if (trimmed.startsWith('not description regex ')) {
+      const patternStr = trimmed.substring('not description regex '.length).trim();
+      const regexSpec = this.parseRegexPattern(patternStr);
+      return { type: 'description-regex', operator: 'regex', value: regexSpec, negate: true };
     }
 
     // Heading filters
@@ -853,6 +924,56 @@ export class QueryParser {
       this.column,
       'Check the query syntax documentation for valid filter instructions'
     );
+  }
+
+  /**
+   * Parse regex pattern from a string
+   * Supports both regex literal format /pattern/flags and string format
+   */
+  private parseRegexPattern(patternStr: string): RegexSpec {
+    // Try to parse as regex literal first
+    const regexSpec = RegexMatcher.parseRegexLiteral(patternStr);
+    if (regexSpec) {
+      // Validate at parse time
+      const patternValidation = RegexMatcher.validatePattern(regexSpec.pattern);
+      if (!patternValidation.valid) {
+        throw new QuerySyntaxError(
+          `Invalid regex pattern: ${patternValidation.error}`,
+          this.line,
+          this.column,
+          'Check your regex syntax'
+        );
+      }
+      
+      const flagsValidation = RegexMatcher.validateFlags(regexSpec.flags || '');
+      if (!flagsValidation.valid) {
+        throw new QuerySyntaxError(
+          `Invalid regex flags: ${flagsValidation.error}`,
+          this.line,
+          this.column,
+          'Only i, m, s, u flags are supported'
+        );
+      }
+      
+      return regexSpec;
+    }
+    
+    // If not a regex literal, treat as plain string pattern (backward compatibility)
+    // Remove quotes if present
+    const pattern = this.unquote(patternStr);
+    
+    // Validate the pattern
+    const validation = RegexMatcher.validatePattern(pattern);
+    if (!validation.valid) {
+      throw new QuerySyntaxError(
+        `Invalid regex pattern: ${validation.error}`,
+        this.line,
+        this.column,
+        'Check your regex syntax'
+      );
+    }
+    
+    return { pattern, flags: '' };
   }
 
 }
