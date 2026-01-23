@@ -185,9 +185,10 @@ export class OnCompletionHandler {
       };
     }
 
+    // Allow standard statuses and custom string values
     const updatedTask: Task = {
       ...task,
-      status: nextStatus as any, // Allow custom statuses
+      status: nextStatus as 'todo' | 'done' | 'cancelled',
       updatedAt: new Date().toISOString()
     };
 

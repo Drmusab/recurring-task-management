@@ -335,6 +335,12 @@ export class RecurrenceEngineRRULE {
    * @private
    */
   private legacyFrequencyToRRule(frequency: Frequency, dtstart: Date): string {
+    // Validate frequency type
+    const validFrequencies = ['daily', 'weekly', 'monthly', 'yearly'];
+    if (!validFrequencies.includes(frequency.type.toLowerCase())) {
+      throw new Error(`Invalid frequency type: ${frequency.type}. Must be one of: ${validFrequencies.join(', ')}`);
+    }
+    
     const freq = frequency.type.toUpperCase();
     const interval = frequency.interval || 1;
     const parts = [`FREQ=${freq}`, `INTERVAL=${interval}`];

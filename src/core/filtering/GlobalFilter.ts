@@ -359,8 +359,16 @@ export class GlobalFilter {
       return description;
     }
     
-    const normalizedFilterTag = this.normalizeTag(this.config.tag);
-    const tagPattern = new RegExp(`\\s*${normalizedFilterTag.replace('#', '\\#')}\\s*`, 'gi');
-    return description.replace(tagPattern, ' ').trim();
+    // Create and cache the regex if not already cached
+    if (!this.cachedTagRemovalRegex || this.lastCachedTag !== this.config.tag) {
+      const normalizedFilterTag = this.normalizeTag(this.config.tag);
+      this.cachedTagRemovalRegex = new RegExp(`\\s*${normalizedFilterTag.replace('#', '\\#')}\\s*`, 'gi');
+      this.lastCachedTag = this.config.tag;
+    }
+    
+    return description.replace(this.cachedTagRemovalRegex, ' ').trim();
   }
+  
+  private cachedTagRemovalRegex?: RegExp;
+  private lastCachedTag?: string;
 }

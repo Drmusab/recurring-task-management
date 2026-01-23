@@ -23,9 +23,12 @@ export class PlaceholderResolver {
     
     let resolved = query;
     for (const [placeholder, value] of Object.entries(replacements)) {
-      // Use global regex to replace all occurrences
-      const regex = new RegExp(this.escapeRegex(placeholder), 'g');
-      resolved = resolved.replace(regex, value);
+      // Check if placeholder exists in query before creating regex
+      if (query.includes(placeholder)) {
+        // Create regex only when needed
+        const regex = new RegExp(this.escapeRegex(placeholder), 'g');
+        resolved = resolved.replace(regex, value);
+      }
     }
     
     return resolved;

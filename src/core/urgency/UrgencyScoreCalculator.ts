@@ -12,10 +12,15 @@ export interface UrgencyScoreOptions {
 export interface UrgencyCalculation {
   score: number;
   breakdown: {
+    /** Contribution from task priority (weighted by 3) */
     priorityContribution: number;
+    /** Contribution from due date proximity (weighted by 2) */
     dueDateContribution: number;
+    /** Contribution from being overdue (weighted by 5) */
     overdueContribution: number;
+    /** Contribution from scheduled date (weighted by 1.5, max 7.5 points) */
     scheduledContribution: number;
+    /** Contribution from start date (5 points when task can start) */
     startContribution: number;
   };
 }
