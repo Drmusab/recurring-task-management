@@ -127,9 +127,23 @@ export class RecurrenceEngineRRULE {
       // Normalize RRULE string
       const normalized = rruleString.startsWith('RRULE:') ? rruleString : `RRULE:${rruleString}`;
       
-      // Try to parse the RRULE
-      const parsedRule = rrulestr(normalized);
-      const options = { ...parsedRule.origOptions };
+      // Try to parse the RRULE - can return RRule or RRuleSet
+      const parsed = rrulestr(normalized);
+      
+      // Extract options from parsed rule
+      let options;
+      if (parsed instanceof RRule) {
+        options = { ...parsed.origOptions };
+      } else if (parsed instanceof RRuleSet) {
+        const rrules = parsed.rrules();
+        if (rrules && rrules.length > 0) {
+          options = { ...rrules[0].origOptions };
+        } else {
+          return { valid: false, error: 'RRuleSet has no rrules' };
+        }
+      } else {
+        return { valid: false, error: 'Unexpected parsed rule type' };
+      }
       
       // Add dtstart if missing for validation
       if (!options.dtstart) {
@@ -174,20 +188,22 @@ export class RecurrenceEngineRRULE {
     try {
       // Parse the RRULE - rrulestr expects "RRULE:" prefix or just the rule part
       const normalized = rruleString.startsWith('RRULE:') ? rruleString : `RRULE:${rruleString}`;
-      const parsedRule = rrulestr(normalized);
+      const parsed = rrulestr(normalized);
       
-      // rrulestr might return an RRuleSet, extract options from it
+      // Extract options from parsed rule
       let options;
-      if (parsedRule instanceof RRule) {
-        options = parsedRule.origOptions;
-      } else {
+      if (parsed instanceof RRule) {
+        options = parsed.origOptions;
+      } else if (parsed instanceof RRuleSet) {
         // It's an RRuleSet, get the first rrule
-        const rrules = (parsedRule as any).rrules();
+        const rrules = parsed.rrules();
         if (rrules && rrules.length > 0) {
           options = rrules[0].origOptions;
         } else {
           return rruleString;
         }
+      } else {
+        return rruleString;
       }
       
       // Create a new RRule with dtstart to get proper text output
@@ -221,9 +237,24 @@ export class RecurrenceEngineRRULE {
     const rruleString = task.frequency.rruleString!;
     const normalized = rruleString.startsWith('RRULE:') ? rruleString : `RRULE:${rruleString}`;
     
-    // Parse the RRULE string and create options
-    const parsedRule = rrulestr(normalized);
-    const options = { ...parsedRule.origOptions };
+    // Parse the RRULE string - rrulestr can return RRule or RRuleSet
+    const parsed = rrulestr(normalized);
+    
+    // Extract options from parsed rule
+    let options;
+    if (parsed instanceof RRule) {
+      options = { ...parsed.origOptions };
+    } else if (parsed instanceof RRuleSet) {
+      // Extract first rrule from the set
+      const rrules = parsed.rrules();
+      if (rrules && rrules.length > 0) {
+        options = { ...rrules[0].origOptions };
+      } else {
+        throw new Error('RRuleSet has no rrules');
+      }
+    } else {
+      throw new Error('Unexpected parsed rule type');
+    }
     
     // Set dtstart from frequency if available, otherwise use task's dueAt
     if (task.frequency.dtstart) {
