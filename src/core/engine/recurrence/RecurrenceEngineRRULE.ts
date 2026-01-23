@@ -1,6 +1,6 @@
 import type { Task } from "@/core/models/Task";
 import type { Frequency } from "@/core/models/Frequency";
-import { RRule, rrulestr } from "rrule";
+import { RRule, RRuleSet, rrulestr } from "rrule";
 import { getUserTimezone } from "@/utils/timezone";
 import * as logger from "@/utils/logger";
 
@@ -124,8 +124,19 @@ export class RecurrenceEngineRRULE {
     }
 
     try {
+      // Normalize RRULE string
+      const normalized = rruleString.startsWith('RRULE:') ? rruleString : `RRULE:${rruleString}`;
+      
       // Try to parse the RRULE
-      const rrule = rrulestr(rruleString);
+      const parsedRule = rrulestr(normalized);
+      const options = { ...parsedRule.origOptions };
+      
+      // Add dtstart if missing for validation
+      if (!options.dtstart) {
+        options.dtstart = new Date();
+      }
+      
+      const rrule = new RRule(options);
       
       // Basic validation: ensure it can generate at least one occurrence
       const now = new Date();
@@ -133,7 +144,6 @@ export class RecurrenceEngineRRULE {
       
       if (!next) {
         // Check if it's a terminated series (UNTIL or COUNT)
-        const options = rrule.options;
         if (options.until && options.until < now) {
           return { valid: false, error: 'RRULE has expired (UNTIL date is in the past)' };
         }
@@ -157,8 +167,35 @@ export class RecurrenceEngineRRULE {
    * @returns "Every weekday", "Monthly on the 15th", etc.
    */
   toNaturalLanguage(rruleString: string): string {
+    if (!rruleString) {
+      return '';
+    }
+
     try {
-      const rrule = rrulestr(rruleString);
+      // Parse the RRULE - rrulestr expects "RRULE:" prefix or just the rule part
+      const normalized = rruleString.startsWith('RRULE:') ? rruleString : `RRULE:${rruleString}`;
+      const parsedRule = rrulestr(normalized);
+      
+      // rrulestr might return an RRuleSet, extract options from it
+      let options;
+      if (parsedRule instanceof RRule) {
+        options = parsedRule.origOptions;
+      } else {
+        // It's an RRuleSet, get the first rrule
+        const rrules = (parsedRule as any).rrules();
+        if (rrules && rrules.length > 0) {
+          options = rrules[0].origOptions;
+        } else {
+          return rruleString;
+        }
+      }
+      
+      // Create a new RRule with dtstart to get proper text output
+      if (!options.dtstart) {
+        options = {...options, dtstart: new Date()}; // Use current date as default
+      }
+      
+      const rrule = new RRule(options);
       return rrule.toText();
     } catch (error) {
       logger.error("Failed to convert RRULE to natural language", {
@@ -180,18 +217,27 @@ export class RecurrenceEngineRRULE {
       return rrule;
     }
 
-    // Parse and cache
-    rrule = rrulestr(task.frequency.rruleString!);
+    // Normalize RRULE string - rrulestr expects "RRULE:" prefix
+    const rruleString = task.frequency.rruleString!;
+    const normalized = rruleString.startsWith('RRULE:') ? rruleString : `RRULE:${rruleString}`;
     
-    // Set dtstart from frequency if available
+    // Parse the RRULE string and create options
+    const parsedRule = rrulestr(normalized);
+    const options = { ...parsedRule.origOptions };
+    
+    // Set dtstart from frequency if available, otherwise use task's dueAt
     if (task.frequency.dtstart) {
-      const dtstart = new Date(task.frequency.dtstart);
-      rrule.options.dtstart = dtstart;
+      options.dtstart = new Date(task.frequency.dtstart);
+    } else if (task.dueAt) {
+      options.dtstart = new Date(task.dueAt);
     }
     
     // Set timezone
     const timezone = task.frequency.timezone || task.timezone || getUserTimezone();
-    rrule.options.tzid = timezone;
+    options.tzid = timezone;
+    
+    // Create new RRule with updated options
+    rrule = new RRule(options);
     
     this.rruleCache.set(cacheKey, rrule);
     return rrule;
