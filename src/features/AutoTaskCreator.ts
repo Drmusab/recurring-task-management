@@ -39,10 +39,10 @@ function debounce<T extends (...args: any[]) => any>(
     if (timeoutId !== undefined) {
       clearTimeout(timeoutId);
     }
-    timeoutId = window.setTimeout(() => {
+    timeoutId = setTimeout(() => {
       fn(...args);
       timeoutId = undefined;
-    }, delay);
+    }, delay) as unknown as number;
   };
 }
 
@@ -52,6 +52,7 @@ function debounce<T extends (...args: any[]) => any>(
 export class AutoTaskCreator {
   private deps: AutoTaskCreatorDeps;
   private pendingOperations = new Map<string, number>();
+  private debouncedCreateTimeout: number | undefined;
   
   constructor(deps: AutoTaskCreatorDeps) {
     this.deps = deps;
@@ -60,12 +61,19 @@ export class AutoTaskCreator {
   /**
    * Debounced auto-create function (500ms delay)
    */
-  private debouncedCreate = debounce(
-    async (blockId: string, text: string) => {
-      await this.tryAutoCreate(blockId, text);
-    },
-    500
-  );
+  private debouncedCreateInternal = async (blockId: string, text: string) => {
+    await this.tryAutoCreate(blockId, text);
+  };
+  
+  private debouncedCreate = (blockId: string, text: string) => {
+    if (this.debouncedCreateTimeout !== undefined) {
+      clearTimeout(this.debouncedCreateTimeout);
+    }
+    this.debouncedCreateTimeout = setTimeout(() => {
+      this.debouncedCreateInternal(blockId, text);
+      this.debouncedCreateTimeout = undefined;
+    }, 500) as unknown as number;
+  };
   
   /**
    * Handle Enter key press on a checklist block
@@ -214,6 +222,13 @@ export class AutoTaskCreator {
    * Cleanup all pending operations
    */
   cleanup(): void {
+    // Clear debounced timeout
+    if (this.debouncedCreateTimeout !== undefined) {
+      clearTimeout(this.debouncedCreateTimeout);
+      this.debouncedCreateTimeout = undefined;
+    }
+    
+    // Clear any other pending operations
     this.pendingOperations.forEach((timeoutId) => clearTimeout(timeoutId));
     this.pendingOperations.clear();
   }
