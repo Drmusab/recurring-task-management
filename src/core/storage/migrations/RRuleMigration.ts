@@ -35,7 +35,7 @@ export class RRuleMigration {
    * Convert legacy frequency to RRule object
    */
   private static legacyToRRule(freq: Frequency): RRule {
-    const options: Partial<any> = {
+    const options: Partial<Parameters<typeof RRule>[0]> = {
       freq: this.mapFreqType(freq.type),
       interval: freq.interval || 1,
     };
@@ -126,9 +126,9 @@ export class RRuleMigration {
       const legacySnapshot = {
         type: task.frequency.type!,
         interval: task.frequency.interval!,
-        weekdays: task.frequency.weekdays,
-        dayOfMonth: (task.frequency as any).dayOfMonth,
-        month: (task.frequency as any).month,
+        weekdays: 'weekdays' in task.frequency ? task.frequency.weekdays : undefined,
+        dayOfMonth: 'dayOfMonth' in task.frequency ? task.frequency.dayOfMonth : undefined,
+        month: 'month' in task.frequency ? task.frequency.month : undefined,
         migratedAt: new Date().toISOString(),
       };
 
