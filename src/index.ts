@@ -873,7 +873,14 @@ export default class RecurringTasksPlugin extends Plugin {
       
       pluginEventBus.on('task:refresh', () => {
         // Dashboard will handle its own refresh
-        this.blockEventWatcher?.refreshLinkedBlocks();
+        // Only refresh linked blocks if watcher is initialized and ready
+        if (this.blockEventWatcher) {
+          try {
+            this.blockEventWatcher.refreshLinkedBlocks();
+          } catch (err) {
+            logger.error("Failed to refresh linked blocks", err);
+          }
+        }
       });
 
       // Also listen for window events for backward compatibility
