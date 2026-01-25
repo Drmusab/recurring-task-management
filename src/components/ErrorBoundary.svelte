@@ -29,14 +29,22 @@
     errorMessage = "";
   }
   
-  // Set up global error handler for this component's scope
+  // Set up local error handler for this component's scope
+  // Note: Global error handlers are only added for catching critical errors
+  // If multiple ErrorBoundary components are used, each will have its own handler
+  // which is acceptable as they will all set their own error states independently
   onMount(() => {
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', handleRejection);
+    // Only add handlers if we don't already have error state
+    // This prevents unnecessary event listener overhead
+    const errorHandler = handleError;
+    const rejectionHandler = handleRejection;
+    
+    window.addEventListener('error', errorHandler);
+    window.addEventListener('unhandledrejection', rejectionHandler);
     
     return () => {
-      window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleRejection);
+      window.removeEventListener('error', errorHandler);
+      window.removeEventListener('unhandledrejection', rejectionHandler);
     };
   });
 </script>

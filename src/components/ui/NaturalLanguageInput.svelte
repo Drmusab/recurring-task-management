@@ -3,6 +3,9 @@
   import type { Task } from '@/core/models/Task';
   import type { Frequency } from '@/core/models/Frequency';
 
+  // Maximum length for task titles
+  const MAX_TASK_TITLE_LENGTH = 500;
+
   interface Props {
     onTaskCreated?: (task: Partial<Task>) => void;
     initialValue?: string;
@@ -89,8 +92,8 @@
       return;
     }
 
-    if (taskTitle.length > 500) {
-      parseError = "Task title too long (max 500 characters)";
+    if (taskTitle.length > MAX_TASK_TITLE_LENGTH) {
+      parseError = `Task title too long (max ${MAX_TASK_TITLE_LENGTH} characters)`;
       return;
     }
 
