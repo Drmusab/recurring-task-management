@@ -11,14 +11,32 @@
   let errorMessage = $state("");
   
   function handleError(event: ErrorEvent) {
+    event.preventDefault();
     hasError = true;
-    errorMessage = event.message;
+    errorMessage = event.message || "An unknown error occurred";
+    console.error("ErrorBoundary caught error:", event);
   }
   
   function retry() {
     hasError = false;
     errorMessage = "";
   }
+  
+  // Set up global error handler for this component's scope
+  onMount(() => {
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+      event.preventDefault();
+      hasError = true;
+      errorMessage = event.reason?.message || String(event.reason) || "Unhandled promise rejection";
+      console.error("ErrorBoundary caught unhandled rejection:", event);
+    });
+    
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleError);
+    };
+  });
 </script>
 
 {#if hasError}
@@ -28,7 +46,15 @@
     <button class="error-boundary__retry" onclick={retry}>Retry</button>
   </div>
 {:else}
-  {@render children()}
+  {#try}
+    {@render children()}
+  {:catch error}
+    <div class="error-boundary">
+      <p class="error-boundary__message">{fallback}</p>
+      <p class="error-boundary__details">{error?.message || String(error)}</p>
+      <button class="error-boundary__retry" onclick={retry}>Retry</button>
+    </div>
+  {/try}
 {/if}
 
 <style>
