@@ -212,6 +212,15 @@
       }
     });
     
+    // Listen for task edit events (from openTaskEditor)
+    const unsubscribeTaskEdit = pluginEventBus.on('task:edit', (data) => {
+      if (data.task) {
+        handleEditTask(data.task);
+      } else {
+        handleCreateTask();
+      }
+    });
+    
     // Listen for task saved events to refresh list
     const unsubscribeTaskSaved = pluginEventBus.on('task:saved', () => {
       loadTasksFromStorage('external');
@@ -219,6 +228,7 @@
     
     return () => {
       unsubscribeEditorOpen();
+      unsubscribeTaskEdit();
       unsubscribeTaskSaved();
     };
   });

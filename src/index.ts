@@ -5,7 +5,6 @@ import { mount, unmount } from "svelte";
 import Dashboard from "./components/Dashboard.svelte";
 import QuickAddOverlay from "./components/cards/QuickAddOverlay.svelte";
 import PostponeOverlay from "./components/cards/PostponeOverlay.svelte";
-import TaskEditorModal from "./components/TaskEditorModal.svelte";
 import type { Task } from "./core/models/Task";
 import type { Scheduler } from "./core/engine/Scheduler";
 import type { TaskRepositoryProvider } from "./core/storage/TaskRepository";
@@ -59,8 +58,6 @@ export default class RecurringTasksPlugin extends Plugin {
   private dockEl!: HTMLElement;
   private quickAddComponent: ReturnType<typeof mount> | null = null;
   private quickAddContainer: HTMLElement | null = null;
-  private taskEditorComponent: ReturnType<typeof mount> | null = null;
-  private taskEditorContainer: HTMLElement | null = null;
   private postponeComponent: ReturnType<typeof mount> | null = null;
   private postponeContainer: HTMLElement | null = null;
   private pendingCompletionTimeouts: Map<string, number> = new Map();
@@ -1262,39 +1259,20 @@ export default class RecurringTasksPlugin extends Plugin {
   }
 
   /**
-   * Open the full task editor modal
+   * Open the task editor in the dashboard
+   * This method now delegates to the dashboard via event bus
    */
   openTaskEditor(task?: Task) {
-    if (this.taskEditorComponent) {
-      this.closeTaskEditor();
-    }
-    this.taskEditorContainer = document.createElement("div");
-    document.body.appendChild(this.taskEditorContainer);
-    this.taskEditorComponent = mount(TaskEditorModal, {
-      target: this.taskEditorContainer,
-      props: {
-        repository: this.repository,
-        settingsService: this.settingsService,
-        patternLearner: this.patternLearner ?? undefined,
-        task,
-        onClose: () => this.closeTaskEditor(),
-        onSave: () => {
-          // Refresh dashboard
-          window.dispatchEvent(new CustomEvent("recurring-task-refresh"));
-        },
-      },
-    });
+    // Open the dock to show the dashboard
+    this.openDock();
+    
+    // Emit event to dashboard to open editor for this task
+    pluginEventBus.emit('task:edit', { task });
   }
 
   private closeTaskEditor() {
-    if (this.taskEditorComponent) {
-      unmount(this.taskEditorComponent);
-      this.taskEditorComponent = null;
-    }
-    if (this.taskEditorContainer) {
-      this.taskEditorContainer.remove();
-      this.taskEditorContainer = null;
-    }
+    // Deprecated - task editor is now part of the dashboard
+    // This method is kept for backward compatibility but does nothing
   }
 
   /**
@@ -1475,12 +1453,6 @@ export default class RecurringTasksPlugin extends Plugin {
     
     if (taskId) {
       return this.repository.getTask(taskId) || null;
-    }
-    
-    // Example: Get from currently open task editor
-    if (this.taskEditorComponent) {
-      // You'll need to expose the current task from your TaskEditorModal component
-      // This depends on your Svelte component implementation
     }
     
     return null;
