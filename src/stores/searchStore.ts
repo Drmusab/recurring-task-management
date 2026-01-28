@@ -74,6 +74,7 @@ export function applySmartFilters(tasks: Task[], filters: Set<SmartFilter>): Tas
       case 'high-priority':
         results = results.filter(t => {
           const priority = t.priority?.toString().toLowerCase() || '';
+          // Support both priority strings ('high', 'highest') and Obsidian Tasks emoji format ('⏫')
           return priority === 'high' || priority === 'highest' || priority.includes('⏫');
         });
         break;
@@ -101,6 +102,7 @@ export function calculateFilterCounts(tasks: Task[]): Record<SmartFilter, number
     overdue: tasks.filter(t => isOverdue(t)).length,
     'high-priority': tasks.filter(t => {
       const priority = t.priority?.toString().toLowerCase() || '';
+      // Support both priority strings ('high', 'highest') and Obsidian Tasks emoji format ('⏫')
       return priority === 'high' || priority === 'highest' || priority.includes('⏫');
     }).length,
     recurring: tasks.filter(t => t.frequency && t.frequency.type !== 'once').length,

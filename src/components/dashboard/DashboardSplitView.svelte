@@ -10,6 +10,8 @@
   import { searchStore, applySmartFilters } from '@/stores/searchStore';
   import { fuzzySearchTasks } from '@/utils/fuzzySearch';
   import { keyboardShortcutsStore } from '@/stores/keyboardShortcutsStore';
+  import { bulkSelectionStore } from '@/stores/bulkSelectionStore';
+  import { get } from 'svelte/store';
   
   export let tasks: Task[] = [];
   export let statusOptions: Status[] = [];
@@ -64,9 +66,6 @@
     
     // Register bulk mode actions
     keyboardShortcutsStore.registerAction('toggleBulkMode', () => {
-      // Import and call bulkSelectionStore
-      const { bulkSelectionStore } = require('@/stores/bulkSelectionStore');
-      const { get } = require('svelte/store');
       const state = get(bulkSelectionStore);
       if (state.enabled) {
         bulkSelectionStore.disableBulkMode();
@@ -76,7 +75,6 @@
     });
     
     keyboardShortcutsStore.registerAction('selectAllTasks', () => {
-      const { bulkSelectionStore } = require('@/stores/bulkSelectionStore');
       const taskIds = filteredTasks.map(t => t.id);
       bulkSelectionStore.selectAll(taskIds);
     });
