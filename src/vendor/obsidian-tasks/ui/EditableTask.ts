@@ -1,7 +1,7 @@
-import { GlobalFilter, parseTypedDateForSaving, PriorityTools, replaceTaskWithTasks } from '../types/Stubs';
-import type { Status } from '../types/Status';
-import { StatusType } from '../types/Status';
-import { Occurrence, Priority, Recurrence, Task, addDependencyToParent, ensureTaskHasId, generateUniqueId, removeDependency } from '../types/Task';
+import { GlobalFilter, parseTypedDateForSaving, PriorityTools, replaceTaskWithTasks } from '@/vendor/obsidian-tasks/shims/ObsidianShim';
+import type { Status } from '@/vendor/obsidian-tasks/types/Status';
+import { StatusType } from '@/vendor/obsidian-tasks/types/Status';
+import { Occurrence, Priority, Recurrence, Task, addDependencyToParent, ensureTaskHasId, generateUniqueId, removeDependency } from '@/vendor/obsidian-tasks/types/Task';
 
 type OnCompletion = any; // Stub type
 
