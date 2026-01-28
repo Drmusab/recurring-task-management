@@ -9,6 +9,7 @@
   import { selectedTaskStore, selectTask, clearSelection } from '@/stores/selectedTask';
   import { searchStore, applySmartFilters } from '@/stores/searchStore';
   import { fuzzySearchTasks } from '@/utils/fuzzySearch';
+  import { keyboardShortcutsStore } from '@/stores/keyboardShortcutsStore';
   
   export let tasks: Task[] = [];
   export let statusOptions: Status[] = [];
@@ -16,6 +17,8 @@
   export let onTaskSaved: ((task: Task) => Promise<void>) | undefined = undefined;
   export let onNewTask: (() => void) | undefined = undefined;
   export let onClose: (() => void) | undefined = undefined;
+  
+  let quickSearchRef: QuickSearch;
   
   // Subscribe to selectedTaskStore
   $: currentTask = $selectedTaskStore;
@@ -45,12 +48,35 @@
         selectTask(task);
       }
     }
+    
+    // Register keyboard shortcut actions
+    keyboardShortcutsStore.registerAction('focusSearch', () => {
+      quickSearchRef?.focus();
+    });
+    
+    keyboardShortcutsStore.registerAction('createNewTask', () => {
+      if (onNewTask) onNewTask();
+    });
+    
+    keyboardShortcutsStore.registerAction('closeEditor', () => {
+      clearSelection();
+    });
+    
+    // Register global keyboard handler
+    window.addEventListener('keydown', keyboardShortcutsStore.handleKeydown);
   });
   
   onDestroy(() => {
     // Clean up is handled automatically by Svelte for $ subscriptions
     // Clear search state when dashboard is closed
     searchStore.clear();
+    
+    // Unregister keyboard handlers
+    keyboardShortcutsStore.unregisterAction('focusSearch');
+    keyboardShortcutsStore.unregisterAction('createNewTask');
+    keyboardShortcutsStore.unregisterAction('closeEditor');
+    
+    window.removeEventListener('keydown', keyboardShortcutsStore.handleKeydown);
   });
   
   function handleTaskSelect(task: Task) {
@@ -95,7 +121,7 @@
 <div class="dashboard-split-view">
   <div class="left-panel">
     <div class="search-header">
-      <QuickSearch />
+      <QuickSearch bind:this={quickSearchRef} />
       <SmartFilters {tasks} />
     </div>
     
