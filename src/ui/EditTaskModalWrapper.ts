@@ -6,7 +6,6 @@
  */
 
 import { mount, unmount } from 'svelte';
-import type { ComponentType } from 'svelte';
 import type { Task } from '@/vendor/obsidian-tasks/types/Task';
 import type { Status } from '@/vendor/obsidian-tasks/types/Status';
 import EditTaskCore from '@/ui/EditTaskCore.svelte';
@@ -53,7 +52,7 @@ export class EditTaskModal {
         modalContent.classList.add('edit-task-modal-content');
         this.container.appendChild(modalContent);
 
-        // Mount EditTaskCore in modal mode
+        // Mount EditTaskCore in modal mode with callback props
         this.component = mount(EditTaskCore, {
             target: modalContent,
             props: {
@@ -61,14 +60,9 @@ export class EditTaskModal {
                 allTasks: this.options.allTasks,
                 statusOptions: this.options.statusOptions,
                 mode: 'modal',
-            },
-            events: {
-                save: (event: CustomEvent<Task[]>) => {
-                    this.handleSave(event.detail);
-                },
-                cancel: () => {
-                    this.close();
-                },
+                // Pass callbacks as props that will handle component events
+                onSave: (updatedTasks: Task[]) => this.handleSave(updatedTasks),
+                onCancel: () => this.close(),
             },
         });
 

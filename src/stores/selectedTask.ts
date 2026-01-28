@@ -6,7 +6,7 @@
  * decoupling TaskListPane from TaskEditorPane.
  */
 
-import { writable } from 'svelte/store';
+import { writable, get } from 'svelte/store';
 import type { Task } from '@/vendor/obsidian-tasks/types/Task';
 
 /**
@@ -36,9 +36,6 @@ export function clearSelection(): void {
  * @returns true if the task is selected
  */
 export function isTaskSelected(task: Task): boolean {
-    let isSelected = false;
-    selectedTaskStore.subscribe(selectedTask => {
-        isSelected = selectedTask?.id === task.id;
-    })();
-    return isSelected;
+    const selectedTask = get(selectedTaskStore);
+    return selectedTask?.id === task.id;
 }

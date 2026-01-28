@@ -5,7 +5,6 @@
 
 import { describe, it, expect } from 'vitest';
 import { MODE_CONFIGS } from '@/types/EditTaskMode';
-import type { EditTaskMode } from '@/types/EditTaskMode';
 import { selectedTaskStore, selectTask, clearSelection } from '@/stores/selectedTask';
 import { get } from 'svelte/store';
 

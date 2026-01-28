@@ -19,6 +19,9 @@
     export let statusOptions: Status[];
     export let allTasks: Task[];
     export let mode: EditTaskMode = 'modal';
+    // Optional callback props (for direct usage, alternative to events)
+    export let onSave: ((updatedTasks: Task[]) => void | Promise<void>) | undefined = undefined;
+    export let onCancel: (() => void) | undefined = undefined;
 
     // Event dispatcher for save and cancel events
     const dispatch = createEventDispatcher<{
@@ -78,10 +81,21 @@
 
     $: isShownInEditModal = { ...defaultEditModalShowSettings, ...$settingsStore.isShownInEditModal };
 
-    // Track unsaved changes
+    // Track unsaved changes - reset when task changes
     $: {
         const currentState = JSON.stringify(editableTask);
-        hasUnsavedChanges = currentState !== initialTaskState;
+        if (currentState !== initialTaskState) {
+            hasUnsavedChanges = true;
+        }
+    }
+
+    // Reset initial state when task prop changes
+    $: {
+        if (task) {
+            editableTask = EditableTask.fromTask(task, allTasks);
+            initialTaskState = JSON.stringify(editableTask);
+            hasUnsavedChanges = false;
+        }
     }
 
     // Auto-save logic for embedded mode
@@ -94,6 +108,12 @@
             initialTaskState = JSON.stringify(editableTask);
             hasUnsavedChanges = false;
         }, modeConfig.autoSaveDelayMs);
+    } else {
+        // Clear timer if conditions are no longer met
+        if (autoSaveTimer) {
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = null;
+        }
     }
 
     onMount(() => {
@@ -121,6 +141,9 @@
 
     const _onClose = () => {
         dispatch('cancel');
+        if (onCancel) {
+            onCancel();
+        }
     };
 
     const _onDescriptionKeyDown = (e: KeyboardEvent) => {
@@ -142,6 +165,9 @@
     const _onSubmit = async () => {
         const newTasks = await editableTask.applyEdits(task, allTasks);
         dispatch('save', newTasks);
+        if (onSave) {
+            await onSave(newTasks);
+        }
     };
 </script>
 
