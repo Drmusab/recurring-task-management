@@ -62,6 +62,25 @@
       clearSelection();
     });
     
+    // Register bulk mode actions
+    keyboardShortcutsStore.registerAction('toggleBulkMode', () => {
+      // Import and call bulkSelectionStore
+      const { bulkSelectionStore } = require('@/stores/bulkSelectionStore');
+      const { get } = require('svelte/store');
+      const state = get(bulkSelectionStore);
+      if (state.enabled) {
+        bulkSelectionStore.disableBulkMode();
+      } else {
+        bulkSelectionStore.enableBulkMode();
+      }
+    });
+    
+    keyboardShortcutsStore.registerAction('selectAllTasks', () => {
+      const { bulkSelectionStore } = require('@/stores/bulkSelectionStore');
+      const taskIds = filteredTasks.map(t => t.id);
+      bulkSelectionStore.selectAll(taskIds);
+    });
+    
     // Register global keyboard handler
     window.addEventListener('keydown', keyboardShortcutsStore.handleKeydown);
   });
@@ -75,6 +94,8 @@
     keyboardShortcutsStore.unregisterAction('focusSearch');
     keyboardShortcutsStore.unregisterAction('createNewTask');
     keyboardShortcutsStore.unregisterAction('closeEditor');
+    keyboardShortcutsStore.unregisterAction('toggleBulkMode');
+    keyboardShortcutsStore.unregisterAction('selectAllTasks');
     
     window.removeEventListener('keydown', keyboardShortcutsStore.handleKeydown);
   });
@@ -104,6 +125,41 @@
     }
   }
   
+  async function handleTaskReorder(reorderedTasks: Task[]): Promise<void> {
+    // Update all tasks with new order
+    tasks = reorderedTasks;
+    
+    // Save all tasks with new order
+    for (const task of reorderedTasks) {
+      if (onTaskSaved) {
+        await onTaskSaved(task);
+      }
+    }
+  }
+  
+  async function handleBulkUpdate(updatedTasks: Task[]): Promise<void> {
+    // Update tasks in the tasks array
+    updatedTasks.forEach(updatedTask => {
+      const index = tasks.findIndex(t => t.id === updatedTask.id);
+      if (index !== -1) {
+        tasks[index] = updatedTask;
+      }
+    });
+    tasks = [...tasks]; // Trigger reactivity
+    
+    // Save each updated task
+    for (const task of updatedTasks) {
+      if (onTaskSaved) {
+        await onTaskSaved(task);
+      }
+    }
+  }
+  
+  function handleBulkDelete(taskIds: string[]): void {
+    // Remove deleted tasks from the tasks array
+    tasks = tasks.filter(t => !taskIds.includes(t.id));
+  }
+  
   function handleNewTask() {
     if (onNewTask) {
       onNewTask();
@@ -130,6 +186,10 @@
       selectedTaskId={currentTask?.id}
       onTaskSelect={handleTaskSelect}
       onNewTask={handleNewTask}
+      onTaskReorder={handleTaskReorder}
+      onBulkUpdate={handleBulkUpdate}
+      onBulkDelete={handleBulkDelete}
+      enableDragReorder={true}
     />
   </div>
   
