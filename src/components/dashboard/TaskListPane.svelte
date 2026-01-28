@@ -1,20 +1,29 @@
 <script lang="ts">
   import TaskRow from './TaskRow.svelte';
+  import DraggableTaskRow from './DraggableTaskRow.svelte';
   import type { Task } from '@/vendor/obsidian-tasks/types/Task';
   import { onMount, onDestroy } from 'svelte';
   import { clearSelection } from '@/stores/selectedTask';
+  import { sortByOrder } from '@/utils/reorderTasks';
   
   export let tasks: Task[];
   export let selectedTaskId: string | undefined = undefined;
   export let onTaskSelect: (task: Task) => void;
   export let onNewTask: () => void;
+  export let onTaskReorder: ((reorderedTasks: Task[]) => void) | undefined = undefined;
+  export let enableDragReorder: boolean = false;
   
   let focusIndex = 0;
   let taskRowsContainer: HTMLElement;
   let containerElement: HTMLElement;
+  let draggingTask: Task | null = null;
+  let dragOverTask: Task | null = null;
+  
+  // Sort tasks by order if drag-reorder is enabled
+  $: displayTasks = enableDragReorder ? sortByOrder(tasks) : tasks;
   
   // Reset focus index when tasks change
-  $: if (tasks) {
+  $: if (displayTasks) {
     focusIndex = 0;
   }
   
@@ -24,12 +33,12 @@
       return;
     }
     
-    if (tasks.length === 0) return;
+    if (displayTasks.length === 0) return;
     
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        focusIndex = Math.min(focusIndex + 1, tasks.length - 1);
+        focusIndex = Math.min(focusIndex + 1, displayTasks.length - 1);
         scrollToIndex(focusIndex);
         focusTaskAtIndex(focusIndex);
         break;
@@ -43,8 +52,8 @@
       
       case 'Enter':
         e.preventDefault();
-        if (tasks[focusIndex]) {
-          onTaskSelect(tasks[focusIndex]);
+        if (displayTasks[focusIndex]) {
+          onTaskSelect(displayTasks[focusIndex]);
         }
         break;
       
@@ -77,6 +86,41 @@
     onTaskSelect(task);
   }
   
+  // Drag-and-drop handlers
+  function handleDragStart(task: Task) {
+    draggingTask = task;
+  }
+  
+  function handleDragEnd() {
+    draggingTask = null;
+    dragOverTask = null;
+  }
+  
+  function handleDrop(targetTask: Task) {
+    if (!draggingTask || !onTaskReorder) return;
+    
+    const fromIndex = displayTasks.findIndex(t => t.id === draggingTask!.id);
+    const toIndex = displayTasks.findIndex(t => t.id === targetTask.id);
+    
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) return;
+    
+    // Reorder tasks
+    const reordered = [...displayTasks];
+    const [removed] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, removed);
+    
+    // Update order field
+    const withOrder = reordered.map((task, index) => ({
+      ...task,
+      order: index
+    }));
+    
+    onTaskReorder(withOrder);
+    
+    draggingTask = null;
+    dragOverTask = null;
+  }
+  
   onMount(() => {
     // Add keyboard listener to the container instead of window
     if (containerElement) {
@@ -94,7 +138,7 @@
 <div class="task-list-pane" bind:this={containerElement}>
   <div class="task-list-header">
     <div class="task-count">
-      {tasks.length} {tasks.length === 1 ? 'task' : 'tasks'}
+      {displayTasks.length} {displayTasks.length === 1 ? 'task' : 'tasks'}
     </div>
     <button class="new-task-btn" on:click={onNewTask}>
       + New Task
@@ -102,18 +146,29 @@
   </div>
   
   <div class="task-rows" bind:this={taskRowsContainer}>
-    {#if tasks.length === 0}
+    {#if displayTasks.length === 0}
       <div class="no-tasks">
         <p>No tasks found</p>
       </div>
     {:else}
-      {#each tasks as task, index (task.id)}
-        <div on:click={() => handleTaskClick(task)} role="button" tabindex="0">
-          <TaskRow 
-            {task} 
+      {#each displayTasks as task, index (task.id)}
+        {#if enableDragReorder}
+          <DraggableTaskRow 
+            {task}
             selected={task.id === selectedTaskId}
+            isDragging={draggingTask?.id === task.id}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDrop={handleDrop}
           />
-        </div>
+        {:else}
+          <div on:click={() => handleTaskClick(task)} role="button" tabindex="0">
+            <TaskRow 
+              {task} 
+              selected={task.id === selectedTaskId}
+            />
+          </div>
+        {/if}
       {/each}
     {/if}
   </div>
