@@ -2,8 +2,32 @@
  * Recurring Dashboard Styles
  * 
  * Styles for the persistent dashboard view that hosts the task editor.
- * Includes responsive breakpoints, loading states, and error handling UI.
+ * Includes split-view layout, responsive breakpoints, loading states, and error handling UI.
  */
+
+/* Split-view container */
+.recurring-dashboard-container {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Task list panel (left side) */
+.recurring-dashboard-list {
+  width: 300px;
+  min-width: 250px;
+  max-width: 400px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Editor panel (right side) */
+.recurring-dashboard-editor {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0; /* Allow flex shrinking */
+}
 
 .recurring-dashboard-wrapper {
   display: flex;
@@ -126,6 +150,19 @@
 
 /* Responsive adjustments for narrow viewports */
 @media (max-width: 767px) {
+  /* Stack vertically on mobile */
+  .recurring-dashboard-container {
+    flex-direction: column;
+  }
+
+  .recurring-dashboard-list {
+    width: 100%;
+    max-width: none;
+    height: 200px;
+    border-right: none;
+    border-bottom: 1px solid var(--b3-border-color);
+  }
+
   .recurring-dashboard-wrapper {
     padding: 16px;
   }

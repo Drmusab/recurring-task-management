@@ -2,7 +2,7 @@ import { GlobalFilter } from '@/core/filtering/GlobalFilter';
 import type { GlobalFilterProfile } from '@/core/filtering/FilterRule';
 import { Plugin } from "siyuan";
 import { mount, unmount } from "svelte";
-import Dashboard from "./components/Dashboard.svelte";
+import { RecurringDashboardView } from "./dashboard/RecurringDashboardView";
 import QuickAddOverlay from "./components/cards/QuickAddOverlay.svelte";
 import PostponeOverlay from "./components/cards/PostponeOverlay.svelte";
 import type { Task } from "./core/models/Task";
@@ -54,7 +54,7 @@ export default class RecurringTasksPlugin extends Plugin {
   private migrationManager!: MigrationManager;
   private topbarMenu!: TopbarMenu;
   private settingsService!: SettingsService;
-  private dashboardComponent: ReturnType<typeof mount> | null = null;
+  private dashboardView: RecurringDashboardView | null = null;
   private dockEl!: HTMLElement;
   private quickAddComponent: ReturnType<typeof mount> | null = null;
   private quickAddContainer: HTMLElement | null = null;
@@ -824,27 +824,21 @@ export default class RecurringTasksPlugin extends Plugin {
   }
 
   private renderDashboard() {
-    if (this.dockEl && !this.dashboardComponent) {
-      this.dashboardComponent = mount(Dashboard, {
-        target: this.dockEl,
-        props: {
-          repository: this.repository,
-          scheduler: this.scheduler,
-          eventService: this.eventService,
-          shortcutManager: this.shortcutManager,
-          settingsService: this.settingsService,
-          patternLearner: this.patternLearner ?? undefined,
-          app: this.app,
-          webhookServer: this.webhookServer, // Pass webhook server to dashboard
-        },
+    if (this.dockEl && !this.dashboardView) {
+      this.dashboardView = new RecurringDashboardView(this.dockEl, {
+        repository: this.repository,
+        settingsService: this.settingsService,
+        recurrenceEngine: this.scheduler.getRecurrenceEngine(),
+        patternLearner: this.patternLearner ?? undefined,
       });
+      this.dashboardView.mount();
     }
   }
 
   private destroyDashboard() {
-    if (this.dashboardComponent) {
-      unmount(this.dashboardComponent);
-      this.dashboardComponent = null;
+    if (this.dashboardView) {
+      this.dashboardView.unmount();
+      this.dashboardView = null;
     }
   }
 

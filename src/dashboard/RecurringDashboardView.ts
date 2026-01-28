@@ -3,9 +3,10 @@
  * 
  * This view provides a persistent dashboard for managing recurring tasks.
  * It mounts the Obsidian-Tasks EditTask component in a persistent sidebar view
- * instead of as a modal dialog.
+ * instead of as a modal dialog, with a task list panel on the left.
  * 
  * Features:
+ * - Split view: Task list + EditTask editor
  * - Error boundaries for robust component mounting
  * - Loading state indicators
  * - Proper cleanup on unmount
@@ -14,6 +15,7 @@
 
 import { mount, unmount } from "svelte";
 import EditTask from "@/vendor/obsidian-tasks/ui/EditTask.svelte";
+import TaskListPanel from "@/dashboard/components/TaskListPanel.svelte";
 import { EditableTask } from "@/vendor/obsidian-tasks/ui/EditableTask";
 import type { Task } from "@/core/models/Task";
 import type { TaskRepositoryProvider } from "@/core/storage/TaskRepository";
@@ -37,7 +39,8 @@ export interface RecurringDashboardViewProps {
  * Dashboard view that mounts Obsidian-Tasks EditTask component with error handling
  */
 export class RecurringDashboardView {
-  private component: ReturnType<typeof mount> | null = null;
+  private editorComponent: ReturnType<typeof mount> | null = null;
+  private listComponent: ReturnType<typeof mount> | null = null;
   private container: HTMLElement;
   private props: RecurringDashboardViewProps;
   private currentTask?: Task;
@@ -56,7 +59,7 @@ export class RecurringDashboardView {
    * Mount the dashboard view with full feature support and error boundary
    */
   mount(initialTask?: Task): void {
-    if (this.component) {
+    if (this.editorComponent) {
       return;
     }
 
@@ -72,40 +75,99 @@ export class RecurringDashboardView {
       // Set loading state AFTER clearing container
       this.setLoading(true);
       
-      // Create wrapper with proper styling
-      const wrapper = document.createElement("div");
-      wrapper.className = "recurring-dashboard-wrapper tasks-modal";
-      this.container.appendChild(wrapper);
+      // Create split-view container
+      const splitContainer = document.createElement("div");
+      splitContainer.className = "recurring-dashboard-container";
+      this.container.appendChild(splitContainer);
 
-      // Get all tasks for dependency resolution
-      const allTasks = this.getAllTasks();
+      // Left panel: Task list
+      const listPanel = document.createElement("div");
+      listPanel.className = "recurring-dashboard-list";
+      splitContainer.appendChild(listPanel);
 
-      // Convert task using TaskDraftAdapter - EditTask expects Task, not EditableTask
-      const obsidianTask = this.currentTask
-        ? TaskDraftAdapter.toObsidianTaskStub(this.currentTask)
-        : TaskDraftAdapter.toObsidianTaskStub(this.createEmptyTask());
+      // Right panel: EditTask editor
+      const editorPanel = document.createElement("div");
+      editorPanel.className = "recurring-dashboard-editor";
+      splitContainer.appendChild(editorPanel);
 
-      // Convert all tasks to Obsidian format for the UI
-      const allObsidianTasks = allTasks.map(task => 
-        TaskDraftAdapter.toObsidianTaskStub(task)
-      );
+      // Mount task list
+      this.mountTaskList(listPanel);
 
-      // Mount EditTask component with error boundary
-      this.component = mount(EditTask, {
-        target: wrapper,
-        props: {
-          task: obsidianTask,
-          statusOptions: this.getStatusOptions(),
-          allTasks: allObsidianTasks,
-          onSubmit: this.handleSubmit.bind(this),
-        },
-      });
+      // Mount editor
+      this.mountEditor(editorPanel);
 
       this.isMounted = true;
       this.setLoading(false);
     } catch (error) {
       this.handleMountError(error);
     }
+  }
+
+  /**
+   * Mount the task list panel
+   */
+  private mountTaskList(container: HTMLElement): void {
+    const allTasks = this.getAllTasks();
+    
+    this.listComponent = mount(TaskListPanel, {
+      target: container,
+      props: {
+        tasks: allTasks,
+        selectedTaskId: this.currentTask?.id,
+        onTaskSelect: this.handleTaskSelect.bind(this),
+        onNewTask: this.handleNewTask.bind(this),
+      },
+    });
+  }
+
+  /**
+   * Mount the EditTask editor
+   */
+  private mountEditor(container: HTMLElement): void {
+    // Get all tasks for dependency resolution
+    const allTasks = this.getAllTasks();
+
+    // Convert task using TaskDraftAdapter - EditTask expects Task, not EditableTask
+    const obsidianTask = this.currentTask
+      ? TaskDraftAdapter.toObsidianTaskStub(this.currentTask)
+      : TaskDraftAdapter.toObsidianTaskStub(this.createEmptyTask());
+
+    // Convert all tasks to Obsidian format for the UI
+    const allObsidianTasks = allTasks.map(task => 
+      TaskDraftAdapter.toObsidianTaskStub(task)
+    );
+
+    // Create wrapper with proper styling
+    const wrapper = document.createElement("div");
+    wrapper.className = "recurring-dashboard-wrapper tasks-modal";
+    container.appendChild(wrapper);
+
+    // Mount EditTask component with error boundary
+    this.editorComponent = mount(EditTask, {
+      target: wrapper,
+      props: {
+        task: obsidianTask,
+        statusOptions: this.getStatusOptions(),
+        allTasks: allObsidianTasks,
+        onSubmit: this.handleSubmit.bind(this),
+      },
+    });
+  }
+
+  /**
+   * Handle task selection from the list
+   */
+  private handleTaskSelect(task: Task): void {
+    this.currentTask = task;
+    this.refresh();
+  }
+
+  /**
+   * Handle new task button click
+   */
+  private handleNewTask(): void {
+    this.currentTask = undefined;
+    this.refresh();
   }
 
   /**
@@ -233,9 +295,13 @@ export class RecurringDashboardView {
    */
   unmount(): void {
     try {
-      if (this.component) {
-        unmount(this.component);
-        this.component = null;
+      if (this.editorComponent) {
+        unmount(this.editorComponent);
+        this.editorComponent = null;
+      }
+      if (this.listComponent) {
+        unmount(this.listComponent);
+        this.listComponent = null;
       }
       this.container.replaceChildren();
       this.isMounted = false;
@@ -243,7 +309,8 @@ export class RecurringDashboardView {
     } catch (error) {
       console.error('Error during dashboard unmount:', error);
       // Continue cleanup even if unmount fails
-      this.component = null;
+      this.editorComponent = null;
+      this.listComponent = null;
       this.isMounted = false;
       this.isLoading = false;
     }
