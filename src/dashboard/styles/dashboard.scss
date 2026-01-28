@@ -125,7 +125,7 @@
 }
 
 /* Responsive adjustments for narrow viewports */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .recurring-dashboard-wrapper {
     padding: 16px;
   }
@@ -173,8 +173,8 @@
   }
 }
 
-/* Tablet and small desktop (400px - 768px) */
-@media (min-width: 400px) and (max-width: 768px) {
+/* Tablet and small desktop (400px - 767px) */
+@media (min-width: 400px) and (max-width: 767px) {
   .recurring-dashboard-wrapper {
     padding: 20px;
   }

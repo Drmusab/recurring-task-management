@@ -61,9 +61,6 @@ export class RecurringDashboardView {
     }
 
     try {
-      // Set loading state
-      this.setLoading(true);
-
       // Set current task if provided
       if (initialTask) {
         this.currentTask = initialTask;
@@ -71,6 +68,9 @@ export class RecurringDashboardView {
 
       // Clear container
       this.container.innerHTML = "";
+      
+      // Set loading state AFTER clearing container
+      this.setLoading(true);
       
       // Create wrapper with proper styling
       const wrapper = document.createElement("div");
@@ -317,24 +317,35 @@ export class RecurringDashboardView {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('Failed to mount dashboard component:', error);
     
-    // Show error message in UI
-    this.container.innerHTML = `
-      <div class="recurring-dashboard-error">
-        <div class="error-icon">⚠️</div>
-        <h3>Failed to Load Task Editor</h3>
-        <p>${errorMessage}</p>
-        <button class="error-retry-btn">Retry</button>
-      </div>
-    `;
+    // Show error message in UI - use textContent for XSS safety
+    const errorContainer = document.createElement('div');
+    errorContainer.className = 'recurring-dashboard-error';
     
-    // Add retry button handler
-    const retryBtn = this.container.querySelector('.error-retry-btn');
-    if (retryBtn) {
-      retryBtn.addEventListener('click', () => {
-        this.container.innerHTML = '';
-        this.mount(this.currentTask);
-      });
-    }
+    const errorIcon = document.createElement('div');
+    errorIcon.className = 'error-icon';
+    errorIcon.textContent = '⚠️';
+    
+    const errorTitle = document.createElement('h3');
+    errorTitle.textContent = 'Failed to Load Task Editor';
+    
+    const errorText = document.createElement('p');
+    errorText.textContent = errorMessage;
+    
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'error-retry-btn';
+    retryBtn.textContent = 'Retry';
+    retryBtn.addEventListener('click', () => {
+      this.container.innerHTML = '';
+      this.mount(this.currentTask);
+    });
+    
+    errorContainer.appendChild(errorIcon);
+    errorContainer.appendChild(errorTitle);
+    errorContainer.appendChild(errorText);
+    errorContainer.appendChild(retryBtn);
+    
+    this.container.innerHTML = '';
+    this.container.appendChild(errorContainer);
     
     // Also show toast notification
     toast.error(`Dashboard error: ${errorMessage}`);

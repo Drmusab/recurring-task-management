@@ -25,7 +25,7 @@ describe('TaskDraftAdapter Integration Tests', () => {
         frequency: {
           type: 'weekly',
           interval: 2,
-          weekdays: [0, 2, 4], // Mon, Wed, Fri
+          weekdays: [0, 2, 4], // 0=Monday, 2=Wednesday, 4=Friday (0-indexed from Monday)
         },
         enabled: true,
         status: 'todo',
@@ -272,7 +272,9 @@ describe('TaskDraftAdapter Integration Tests', () => {
         blocking: [],
       } as any;
 
-      // "every 0 days" gets parsed but fails validation as invalid format
+      // Note: "every 0 days" gets parsed as interval 0, which is then caught by
+      // the frequency validation check that rejects invalid format before the
+      // specific interval check runs
       expect(() => TaskDraftAdapter.validate(zeroIntervalTask)).toThrow('Invalid recurrence rule');
     });
 

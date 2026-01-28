@@ -244,7 +244,7 @@ If you're migrating from the old TaskEditorModal to this system:
 
 Potential improvements:
 
-1. **Loading States**: Show spinner during save operations
+1. **Advanced Loading States**: Skeleton screens for smoother perceived performance
 2. **Optimistic Updates**: Update UI before server response
 3. **Offline Support**: Queue operations when offline
 4. **Undo/Redo**: Add command history

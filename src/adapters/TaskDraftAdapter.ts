@@ -229,7 +229,7 @@ export class TaskDraftAdapter {
           throw new Error('Invalid recurrence rule format');
         }
         
-        // Check for infinite recurrence edge case
+        // Check for zero interval edge case (should be caught by isValidFrequency, but double-check)
         if (frequency.interval === 0) {
           throw new Error('Recurrence interval cannot be zero');
         }
